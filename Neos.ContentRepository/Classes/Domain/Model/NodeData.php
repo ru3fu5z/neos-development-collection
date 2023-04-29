@@ -44,7 +44,7 @@ use Neos\ContentRepository\Utility;
  *      @ORM\Index(name="parentpath",columns={"parentpath"},options={"lengths": {255}}),
  *      @ORM\Index(name="identifierindex",columns={"identifier"}),
  *      @ORM\Index(name="nodetypeindex",columns={"nodetype"}),
- *      @ORM\Index(name="pathindex",columns={"path"},options={"lengths": {255}})
+ *      @ORM\Index(name="path",columns={"path"},options={"lengths": {255}})
  *    }
  * )
  */
@@ -882,7 +882,6 @@ class NodeData extends AbstractNodeData
 
         if ($this->workspace->getName() !== $targetWorkspace->getName()) {
             if ($targetPath === $originalPath) {
-
                 // The existing shadow node in the target workspace will be used as the actual moved node
                 $movedNodeDataInTargetWorkspace = $targetPathShadowNodeData->getMovedTo();
                 if ($movedNodeDataInTargetWorkspace !== null) {

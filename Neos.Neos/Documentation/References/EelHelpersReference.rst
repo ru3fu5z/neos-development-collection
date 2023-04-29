@@ -3,7 +3,7 @@
 Eel Helpers Reference
 =====================
 
-This reference was automatically generated from code on 2022-09-02
+This reference was automatically generated from code on 2023-04-26
 
 
 .. _`Eel Helpers Reference: Api`:
@@ -1219,6 +1219,30 @@ The input is assumed to be an array or Collection of objects. Groups this input 
 
 
 
+.. _`Eel Helpers Reference: Neos.Backend`:
+
+Neos.Backend
+------------
+
+BackendUser helper for translations in the backend
+
+Implemented in: ``Neos\Neos\Fusion\Helper\BackendHelper``
+
+Neos.Backend.interfaceLanguage()
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The interface language the user selected or the default language defined in the settings
+Formatted as {@see \Neos\Flow\I18n\Locale} identifier, eg "de", "en", ...
+
+Example::
+
+    Translation.id("mh").locale(Neos.Backend.interfaceLanguage()).translate()
+
+
+
+
+
+
 .. _`Eel Helpers Reference: Neos.Caching`:
 
 Neos.Caching
@@ -1333,6 +1357,37 @@ Neos.Link.resolveNodeUri(uri, contextNode, controllerContext)
 * ``controllerContext`` (ControllerContext)
 
 **Return** (string)
+
+
+
+
+
+
+.. _`Eel Helpers Reference: Neos.Media.Assets`:
+
+Neos.Media.Assets
+-----------------
+
+This is a helper for accessing assets from the media library
+
+Implemented in: ``Neos\Media\Eel\AssetsHelper``
+
+Neos.Media.Assets.findByCollection(collection)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Return** (QueryResultInterface<AssetInterface>) | null
+
+Neos.Media.Assets.findByTag(tag)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Return** (QueryResultInterface) | null
+
+Neos.Media.Assets.search(searchTerm, tags, collection)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+* ``tags`` (Tag[]|string[], *optional*)
+
+**Return** (QueryResultInterface<AssetInterface>) | null
 
 
 
@@ -2300,6 +2355,15 @@ Get the class name of the given variable or NULL if it wasn't an object
 * ``variable`` (object)
 
 **Return** (string|NULL)
+
+Type.debugType(variable)
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Get the classname for objects or type for other values
+
+* ``variable`` (mixed)
+
+**Return** (string)
 
 Type.getType(variable)
 ^^^^^^^^^^^^^^^^^^^^^^

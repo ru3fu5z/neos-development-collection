@@ -47,7 +47,6 @@ use Neos\Neos\Utility\User as UserUtility;
  */
 class WorkspacesController extends AbstractModuleController
 {
-
     /**
      * @Flow\Inject
      * @var PublishingService
@@ -413,13 +412,13 @@ class WorkspacesController extends AbstractModuleController
                 $this->addFlashMessage(
                     $this->translator->translateById('workspaces.selectedChangesHaveBeenPublished', [], null, null, 'Modules', 'Neos.Neos')
                 );
-            break;
+                break;
             case 'discard':
                 $this->publishingService->discardNodes($nodes);
                 $this->addFlashMessage(
                     $this->translator->translateById('workspaces.selectedChangesHaveBeenDiscarded', [], null, null, 'Modules', 'Neos.Neos')
                 );
-            break;
+                break;
             default:
                 throw new \RuntimeException('Invalid action "' . htmlspecialchars($action) . '" given.', 1346167441);
         }
@@ -607,8 +606,8 @@ class WorkspacesController extends AbstractModuleController
                         'diff' => $diffArray
                     ];
                 }
-                // The && in belows condition is on purpose as creating a thumbnail for comparison only works if actually
-                // BOTH are ImageInterface (or NULL).
+            // The && in belows condition is on purpose as creating a thumbnail for comparison only works if actually
+            // BOTH are ImageInterface (or NULL).
             } elseif (
                 ($originalPropertyValue instanceof ImageInterface || $originalPropertyValue === null)
                 && ($changedPropertyValue instanceof ImageInterface || $changedPropertyValue === null)
@@ -721,15 +720,20 @@ class WorkspacesController extends AbstractModuleController
      * Creates an array of workspace names and their respective titles which are possible base workspaces for other
      * workspaces.
      *
-     * @param Workspace $excludedWorkspace If set, this workspace will be excluded from the list of returned workspaces
+     * @param Workspace $excludedWorkspace If set, this workspace and all its child workspaces will be excluded from the list of returned workspaces
      * @return array
      */
     protected function prepareBaseWorkspaceOptions(Workspace $excludedWorkspace = null)
     {
         $baseWorkspaceOptions = [];
+
         foreach ($this->workspaceRepository->findAll() as $workspace) {
             /** @var Workspace $workspace */
-            if (!$workspace->isPersonalWorkspace() && $workspace !== $excludedWorkspace && ($workspace->isPublicWorkspace() || $workspace->isInternalWorkspace() || $this->userService->currentUserCanManageWorkspace($workspace))) {
+            if (!$workspace->isPersonalWorkspace() &&
+                $workspace !== $excludedWorkspace &&
+                ($workspace->isPublicWorkspace() || $workspace->isInternalWorkspace() || $this->userService->currentUserCanManageWorkspace($workspace)) &&
+                (!$excludedWorkspace || !isset($workspace->getBaseWorkspaces()[$excludedWorkspace->getName()]))
+            ) {
                 $baseWorkspaceOptions[$workspace->getName()] = $workspace->getTitle();
             }
         }

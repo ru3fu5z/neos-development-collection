@@ -20,6 +20,7 @@ use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Cli\CommandController;
+use Neos\Flow\Cli\Exception\StopCommandException;
 use Neos\Flow\Persistence\Exception\IllegalObjectTypeException;
 use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Flow\Reflection\ReflectionService;
@@ -31,7 +32,9 @@ use Neos\Media\Domain\Model\AssetSource\AssetSourceAwareInterface;
 use Neos\Media\Domain\Model\Tag;
 use Neos\Media\Domain\Model\VariantSupportInterface;
 use Neos\Media\Domain\Repository\AssetRepository;
+use Neos\Media\Domain\Repository\ImageVariantRepository;
 use Neos\Media\Domain\Repository\ThumbnailRepository;
+use Neos\Media\Domain\Service\AssetService;
 use Neos\Media\Domain\Service\AssetVariantGenerator;
 use Neos\Media\Domain\Service\ThumbnailService;
 use Neos\Media\Domain\Strategy\AssetModelMappingStrategyInterface;
@@ -74,6 +77,18 @@ class MediaCommandController extends CommandController
      * @var ThumbnailRepository
      */
     protected $thumbnailRepository;
+
+    /**
+     * @Flow\Inject
+     * @var ImageVariantRepository
+     */
+    protected $imageVariantRepository;
+
+    /**
+     * @Flow\Inject
+     * @var AssetService
+     */
+    protected $assetService;
 
     /**
      * @Flow\Inject
@@ -123,15 +138,14 @@ class MediaCommandController extends CommandController
         $this->initializeConnection();
 
         $sql = '
-			SELECT
-				r.persistence_object_identifier, r.filename, r.mediatype
-			FROM neos_flow_resourcemanagement_persistentresource r
-			LEFT JOIN neos_media_domain_model_asset a
-			ON a.resource = r.persistence_object_identifier
-			LEFT JOIN neos_media_domain_model_thumbnail t
-			ON t.resource = r.persistence_object_identifier
-			WHERE a.persistence_object_identifier IS NULL AND t.persistence_object_identifier IS NULL
-		';
+            SELECT r.persistence_object_identifier, r.filename, r.mediatype
+            FROM neos_flow_resourcemanagement_persistentresource r
+            LEFT JOIN neos_media_domain_model_asset a
+            ON a.resource = r.persistence_object_identifier
+            LEFT JOIN neos_media_domain_model_thumbnail t
+            ON t.resource = r.persistence_object_identifier
+            WHERE a.persistence_object_identifier IS NULL AND t.persistence_object_identifier IS NULL
+        ';
         $statement = $this->dbalConnection->prepare($sql);
         $statement->execute();
         $resourceInfos = $statement->fetchAll();
@@ -175,7 +189,7 @@ class MediaCommandController extends CommandController
      * @param bool $quiet If set, only errors will be displayed.
      * @param bool $assumeYes If set, "yes" is assumed for the "shall I remove ..." dialogs
      * @param string $onlyTags Comma-separated list of asset tag labels, that should be taken into account
-     * @param int $limit Limit the result of unused assets displayed and removed for this run.
+     * @param int|null $limit Limit the result of unused assets displayed and removed for this run.
      * @param string $onlyCollections Comma-separated list of asset collection titles, that should be taken into account
      * @return void
      * @throws IllegalObjectTypeException
@@ -261,7 +275,7 @@ class MediaCommandController extends CommandController
 
         if ($unusedAssetCount === 0) {
             !$quiet && $this->output->outputLine(PHP_EOL . 'No unused assets found.');
-            exit;
+            $this->quit(1);
         }
 
         foreach ($tableRowsByAssetSource as $assetSourceIdentifier => $tableRows) {
@@ -277,7 +291,7 @@ class MediaCommandController extends CommandController
 
         if ($assumeYes === false) {
             if (!$this->output->askConfirmation(sprintf('Do you want to remove <b>%s</b> unused assets?', $unusedAssetCount))) {
-                exit(1);
+                $this->quit(1);
             }
         }
 
@@ -287,6 +301,7 @@ class MediaCommandController extends CommandController
             $this->assetRepository->remove($asset);
         }
         !$quiet && $this->output->progressFinish();
+        !$quiet && $this->output->outputLine();
     }
 
     /**
@@ -295,9 +310,9 @@ class MediaCommandController extends CommandController
      * Creates thumbnail images based on the configured thumbnail presets. Optional ``preset`` parameter to only create
      * thumbnails for a specific thumbnail preset configuration.
      *
-     * Additionally accepts a ``async`` parameter determining if the created thumbnails are generated when created.
+     * Additionally, accepts a ``async`` parameter determining if the created thumbnails are generated when created.
      *
-     * @param string $preset Preset name, if not provided thumbnails are created for all presets
+     * @param string|null $preset Preset name, if not provided thumbnails are created for all presets
      * @param bool $async Asynchronous generation, if not provided the setting ``Neos.Media.asyncThumbnails`` is used
      * @param bool $quiet If set, only errors will be displayed.
      * @return void
@@ -308,8 +323,8 @@ class MediaCommandController extends CommandController
         $async = $async ?? $this->asyncThumbnails;
         $presets = $preset !== null ? [$preset] : array_keys($this->thumbnailService->getPresets());
         $presetThumbnailConfigurations = [];
-        foreach ($presets as $preset) {
-            $presetThumbnailConfigurations[] = $this->thumbnailService->getThumbnailConfigurationForPreset($preset, $async);
+        foreach ($presets as $presetName) {
+            $presetThumbnailConfigurations[] = $this->thumbnailService->getThumbnailConfigurationForPreset($presetName, $async);
         }
         $iterator = $this->assetRepository->findAllIterator();
         $imageCount = $this->assetRepository->countAll();
@@ -322,6 +337,7 @@ class MediaCommandController extends CommandController
             }
         }
         !$quiet && $this->output->progressFinish();
+        !$quiet && $this->output->outputLine();
     }
 
     /**
@@ -330,13 +346,13 @@ class MediaCommandController extends CommandController
      * Removes all thumbnail objects and their resources. Optional ``preset`` parameter to only remove thumbnails
      * matching a specific thumbnail preset configuration.
      *
-     * @param string $preset Preset name, if provided only thumbnails matching that preset are cleared
+     * @param string|null $preset Preset name, if provided only thumbnails matching that preset are cleared
      * @param bool $quiet If set, only errors will be displayed.
      * @return void
      * @throws IllegalObjectTypeException
      * @throws ThumbnailServiceException
      */
-    public function clearThumbnailsCommand(string $preset = null, bool $quiet = false)
+    public function clearThumbnailsCommand(string $preset = null, bool $quiet = false): void
     {
         if ($preset !== null) {
             $thumbnailConfiguration = $this->thumbnailService->getThumbnailConfigurationForPreset($preset);
@@ -349,11 +365,14 @@ class MediaCommandController extends CommandController
         }
 
         !$quiet && $this->output->progressStart($thumbnailCount);
-        foreach ($this->thumbnailRepository->iterate($iterator) as $thumbnail) {
+        foreach ($this->thumbnailRepository->iterate($iterator, function ($iteration) {
+            $this->persistAll($iteration);
+        }) as $thumbnail) {
             $this->thumbnailRepository->remove($thumbnail);
             !$quiet && $this->output->progressAdvance(1);
         }
         !$quiet && $this->output->progressFinish();
+        !$quiet && $this->output->outputLine();
     }
 
     /**
@@ -362,7 +381,7 @@ class MediaCommandController extends CommandController
      * Loops over ungenerated thumbnails and renders them. Optional ``limit`` parameter to limit the amount of
      * thumbnails to be rendered to avoid memory exhaustion.
      *
-     * @param integer $limit Limit the amount of thumbnails to be rendered to avoid memory exhaustion
+     * @param int|null $limit Limit the amount of thumbnails to be rendered to avoid memory exhaustion
      * @param bool $quiet If set, only errors will be displayed.
      * @return void
      */
@@ -385,6 +404,124 @@ class MediaCommandController extends CommandController
     }
 
     /**
+     * List all configurations for your imageVariants.
+     *
+     * Doesn't matter if configured under 'Neos.Media.variantPresets' or already deleted from this configuration.
+     * This command will find every single one for you.
+     */
+    public function listVariantPresetsCommand(): void
+    {
+        $currentPresets = $this->assetVariantGenerator->getVariantPresets();
+
+        if (empty($currentPresets)) {
+            $this->outputLine('<b>No configuration</b> for variant presets was found.');
+        } else {
+            $outputPresets = [];
+            foreach ($currentPresets as $presetIdentifier => $variantPreset) {
+                $variantNames = array_keys($variantPreset->variants());
+                foreach ($variantNames as $variantName) {
+                    $outputPresets[] = [$presetIdentifier, $variantName];
+                }
+            }
+            $this->outputLine('The following <b>configured variant presets</b> were found:');
+            $this->output->outputTable($outputPresets, ['Identifier', 'Variant name']);
+        }
+
+        $databaseVariants = $this->imageVariantRepository->findAllWithOutdatedPresets();
+
+        if (empty($databaseVariants)) {
+            $this->outputLine('There were <b>no outdated variant presets</b> in your database.');
+        } else {
+            $formattedDatabaseVariants = [];
+            foreach ($databaseVariants as $variant) {
+                if (!isset($formattedDatabaseVariants[$variant->getPresetIdentifier()][$variant->getPresetVariantName()])) {
+                    $formattedDatabaseVariants[$variant->getPresetIdentifier()][$variant->getPresetVariantName()] = 1;
+                } else {
+                    $formattedDatabaseVariants[$variant->getPresetIdentifier()][$variant->getPresetVariantName()]++;
+                }
+            }
+
+            $outputPresets = [];
+            foreach ($formattedDatabaseVariants as $presetIdentifier => $presetVariantNames) {
+                $presetVariantKeys = array_keys($presetVariantNames);
+
+                foreach ($presetVariantKeys as $key) {
+                    $outputPresets[] = [$presetIdentifier, $key, $presetVariantNames[$key]];
+                }
+            }
+
+            $this->outputLine('<b>No configuration</b> for the following <b>variant presets</b> could be found:');
+            $this->output->outputTable($outputPresets, ['Identifier', 'Variant name', 'Occurrences']);
+
+            $this->outputLine('To delete them, please use the <b>media:removeVariants</b> command.');
+        }
+    }
+
+    /**
+     * Cleanup imageVariants with provided identifier and variant name.
+     * Image variants that are still configured are removed without usage check and
+     * can be regenerated afterwards with `media:renderVariants`.
+     *
+     * This command will not remove any custom cropped image variants.
+     *
+     * @param string $identifier Identifier of variants to remove.
+     * @param string $variantName Variants with this name will be removed (if exist).
+     * @param bool $quiet If set, only errors and questions will be displayed.
+     * @param bool $assumeYes If set, "yes" is assumed for the "shall I remove ..." dialog.
+     * @param int|null $limit Limit the result of unused assets displayed and removed for this run.
+     *
+     * @throws StopCommandException
+     */
+    public function removeVariantsCommand(string $identifier, string $variantName, bool $quiet = false, bool $assumeYes = false, int $limit = null)
+    {
+        $variantsToRemove = $this->imageVariantRepository->findVariantsByIdentifierAndVariantName($identifier, $variantName, $limit);
+        if (empty($variantsToRemove)) {
+            !$quiet && $this->output->outputLine('<em>Did not find any variants with name ' . $variantName . ' in ' . $identifier . '</em>');
+            $this->quit(1);
+        }
+
+        if (!$quiet) {
+            $notLimitedDeletableOutput = '<b>There are %s asset variants ready to be deleted.</b>';
+            $this->outputLine($notLimitedDeletableOutput, [count($variantsToRemove)]);
+            if ($limit) {
+                $this->outputLine('<em> find more by running without the "--limit" parameter</em>');
+            }
+        }
+
+        // if --assume-yes not used: user decision to delete variants
+        if (!$assumeYes && !$this->output->askConfirmation(PHP_EOL . 'Do you want to remove the found variants? [Y,n] ')) {
+            $this->output->outputLine(PHP_EOL . '<em>No variants have been deleted.</em>');
+            $this->quit(1);
+        }
+
+        !$quiet && $this->outputLine(PHP_EOL . '<b>Removing variants:</b>');
+        !$quiet && $this->output->progressStart(count($variantsToRemove));
+
+        $outdatedVariantSize = 0;
+        foreach ($variantsToRemove as $variantToRemove) {
+            !$quiet && $this->output->progressAdvance();
+            $variantSize = $variantToRemove->getResource()->getFileSize();
+
+            try {
+                $variantToRemove->getResource()->disableLifecycleEvents();
+
+                $this->assetRepository->removeWithoutUsageChecks($variantToRemove);
+                $this->persistenceManager->persistAll();
+            } catch (IllegalObjectTypeException $e) {
+                $this->output->outputLine(PHP_EOL . 'Unable to remove %s: "%s"', [get_class($variantToRemove), $variantToRemove->getTitle()]);
+                $this->output->outputLine(PHP_EOL . $e->getMessage());
+                $this->quit(1);
+            }
+
+            $outdatedVariantSize += $variantSize;
+        }
+        !$quiet && $this->output->progressFinish();
+
+        $readableStorageSize = Files::bytesToSizeString($outdatedVariantSize);
+        $this->outputLine(PHP_EOL . '<success>Removed ' . $readableStorageSize . '</success>');
+    }
+
+    /**
      * Render asset variants
      *
      * Loops over missing configured asset variants and renders them. Optional ``limit`` parameter to
@@ -392,14 +529,14 @@ class MediaCommandController extends CommandController
      *
      * If the re-render parameter is given, any existing variants will be rendered again, too.
      *
-     * @param integer $limit Limit the amount of variants to be rendered to avoid memory exhaustion
+     * @param int|null $limit Limit the amount of variants to be rendered to avoid memory exhaustion
      * @param bool $quiet If set, only errors will be displayed.
      * @param bool $recreate If set, existing asset variants will be re-generated and replaced
      * @return void
      * @throws AssetVariantGeneratorException
      * @throws IllegalObjectTypeException
      */
-    public function renderVariantsCommand($limit = null, bool $quiet = false, bool $recreate = false): void
+    public function renderVariantsCommand(int $limit = null, bool $quiet = false, bool $recreate = false): void
     {
         $resultMessage = null;
         $generatedVariants = 0;
@@ -462,15 +599,23 @@ class MediaCommandController extends CommandController
     }
 
     /**
+     * Used as a callback when iterating large results sets
+     */
+    protected function persistAll(int $iteration): void
+    {
+        if ($iteration % 1000 === 0) {
+            $this->persistenceManager->persistAll();
+        }
+    }
+
+    /**
      * Initializes the DBAL connection which is currently bound to the Doctrine Entity Manager
-     *
-     * @return void
      */
     protected function initializeConnection(): void
     {
         if (!$this->entityManager instanceof EntityManager) {
             $this->outputLine('This command only supports database connections provided by the Doctrine ORM Entity Manager.
-				However, the current entity manager is an instance of %s.', [get_class($this->entityManager)]);
+However, the current entity manager is an instance of %s.', [get_class($this->entityManager)]);
             $this->quit(1);
         }
 

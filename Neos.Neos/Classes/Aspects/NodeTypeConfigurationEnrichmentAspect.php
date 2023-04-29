@@ -23,7 +23,6 @@ use Neos\ContentRepository\Domain\Model\NodeType;
  */
 class NodeTypeConfigurationEnrichmentAspect
 {
-
     /**
      * @var array
      * @Flow\InjectConfiguration(package="Neos.Neos", path="userInterface.inspector.dataTypes")
@@ -251,7 +250,7 @@ class NodeTypeConfigurationEnrichmentAspect
                     };
                     $this->applyEditorLabels($nodeTypeLabelIdPrefix, $elementName, $elementConfiguration['ui']['editor'], $elementConfiguration['ui']['editorOptions'], $translationIdGenerator);
                 }
-                if (!is_array($elementConfiguration) || !$this->shouldFetchTranslation($elementConfiguration['ui'])) {
+                if (!is_array($elementConfiguration) || !$this->shouldFetchTranslation($elementConfiguration['ui'] ?? [])) {
                     continue;
                 }
                 $elementConfiguration['ui']['label'] = $this->getInspectorElementTranslationId($nodeTypeLabelIdPrefix, 'creationDialog', $elementName);

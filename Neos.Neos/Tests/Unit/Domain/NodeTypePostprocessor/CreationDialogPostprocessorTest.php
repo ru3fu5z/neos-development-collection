@@ -8,7 +8,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 
 class CreationDialogPostprocessorTest extends UnitTestCase
 {
-
     /**
      * @var CreationDialogPostprocessor
      */
@@ -36,6 +35,7 @@ class CreationDialogPostprocessorTest extends UnitTestCase
                     'ui' => [
                         'showInCreationDialog' => true,
                         'inspector' => [
+                            'position' => 123,
                             'editor' => 'Some\Editor',
                             'editorOptions' => ['some' => 'option'],
                         ],
@@ -47,7 +47,6 @@ class CreationDialogPostprocessorTest extends UnitTestCase
                             'maximum' => 255,
                         ]
                     ],
-                    'position' => 123,
                 ],
             ],
         ];
