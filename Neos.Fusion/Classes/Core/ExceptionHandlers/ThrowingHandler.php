@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Neos\Fusion\Core\ExceptionHandlers;
 
 /*
@@ -22,7 +25,7 @@ class ThrowingHandler extends AbstractRenderingExceptionHandler
     /**
      * Handle an Exception thrown while rendering Fusion
      *
-     * @param array $fusionPath
+     * @param string $fusionPath
      * @param \Exception $exception
      * @return string
      * @throws StopActionException
@@ -39,10 +42,11 @@ class ThrowingHandler extends AbstractRenderingExceptionHandler
      *
      * @param string $fusionPath path causing the exception
      * @param \Exception $exception exception to handle
-     * @param integer $referenceCode
+     * @param string|null $referenceCode
      * @return string
      */
     protected function handle($fusionPath, \Exception $exception, $referenceCode)
     {
+        throw new \BadMethodCallException('Will never be thrown see handleRenderingException.');
     }
 }

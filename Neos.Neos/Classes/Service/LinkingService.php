@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Service;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,22 +10,30 @@ namespace Neos\Neos\Service;
  * source code.
  */
 
-use Neos\ContentRepository\Domain\Model\NodeInterface;
+declare(strict_types=1);
+
+namespace Neos\Neos\Service;
+
+use GuzzleHttp\Psr7\Uri;
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAddress;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Http\BaseUriProvider;
 use Neos\Flow\Http\Exception as HttpException;
+use Neos\Flow\Http\Helper\UriHelper;
 use Neos\Flow\Log\Utility\LogEnvironment;
 use Neos\Flow\Mvc\Controller\ControllerContext;
-use Neos\Flow\Property\PropertyMapper;
-use Neos\Flow\ResourceManagement\ResourceManager;
 use Neos\Media\Domain\Model\AssetInterface;
-use Neos\Media\Domain\Repository\AssetRepository;
 use Neos\Neos\Domain\Model\Site;
 use Neos\Neos\Domain\Repository\SiteRepository;
-use Neos\Neos\Domain\Service\ContentContext;
-use Neos\Neos\Domain\Service\NodeShortcutResolver;
+use Neos\Neos\Domain\SubtreeTagging\NeosSubtreeTag;
 use Neos\Neos\Exception as NeosException;
-use Neos\Neos\TYPO3CR\NeosNodeServiceInterface;
+use Neos\Neos\FrontendRouting\NodeUriBuilder;
+use Neos\Neos\Fusion\Helper\LinkHelper;
+use Neos\Neos\Utility\LegacyNodePathNormalizer;
+use Neos\Neos\Utility\NodePathResolver;
+use Neos\Utility\Arrays;
 use Psr\Http\Message\UriInterface;
 use Psr\Log\LoggerInterface;
 
@@ -46,8 +53,6 @@ use Psr\Log\LoggerInterface;
  * The given path is treated as a path relative to the current node.
  * Examples: given that the current node is ``/sites/acmecom/products/``,
  * ``stapler`` results in ``/sites/acmecom/products/stapler``,
- * ``../about`` results in ``/sites/acmecom/about/``,
- * ``./neos/info`` results in ``/sites/acmecom/products/neos/info``.
  *
  * *``node`` starts with a tilde character (``~``):*
  * The given path is treated as a path relative to the current site node.
@@ -55,57 +60,18 @@ use Psr\Log\LoggerInterface;
  * ``~/about/us`` results in ``/sites/acmecom/about/us``,
  * ``~`` results in ``/sites/acmecom``.
  *
+ * @deprecated with Neos 9. Please use the new {@see NodeUriBuilder} instead and for resolving a relative node path {@see NodePathResolver::resolveNodeAddressByPath()} or utilize the {@see LinkHelper} from Fusion
  * @Flow\Scope("singleton")
  */
 class LinkingService
 {
-    /**
-     * Pattern to match supported URIs.
-     *
-     * @var string
-     */
-    const PATTERN_SUPPORTED_URIS = '/(node|asset):\/\/([a-z0-9\-]+|([a-f0-9]){8}-([a-f0-9]){4}-([a-f0-9]){4}-([a-f0-9]){4}-([a-f0-9]){12})/';
-
-    /**
-     * @Flow\Inject
-     * @var AssetRepository
-     */
-    protected $assetRepository;
-
-    /**
-     * @Flow\Inject
-     * @var ResourceManager
-     */
-    protected $resourceManager;
-
-    /**
-     * @Flow\Inject
-     * @var NodeShortcutResolver
-     */
-    protected $nodeShortcutResolver;
-
-    /**
-     * @Flow\Inject
-     * @var PropertyMapper
-     */
-    protected $propertyMapper;
-
-    /**
-     * @var NodeInterface
-     */
-    protected $lastLinkedNode;
+    protected ?Node $lastLinkedNode;
 
     /**
      * @Flow\Inject
      * @var LoggerInterface
      */
     protected $systemLogger;
-
-    /**
-     * @Flow\Inject
-     * @var NeosNodeServiceInterface
-     */
-    protected $nodeService;
 
     /**
      * @Flow\Inject
@@ -120,40 +86,51 @@ class LinkingService
     protected $baseUriProvider;
 
     /**
+     * @Flow\Inject
+     * @var NodePathResolver
+     */
+    protected $nodePathResolver;
+
+    /**
+     * @Flow\Inject
+     * @var LegacyNodePathNormalizer
+     */
+    protected $legacyNodePathNormalizer;
+
+    /**
+     * @Flow\Inject
+     * @var LinkHelper
+     */
+    protected $newLinkHelper;
+
+    #[Flow\Inject]
+    protected ContentRepositoryRegistry $contentRepositoryRegistry;
+
+    /**
      * @param string|UriInterface $uri
      * @return boolean
+     * @deprecated with Neos 9
      */
     public function hasSupportedScheme($uri): bool
     {
-        if ($uri instanceof UriInterface) {
-            $uri = (string)$uri;
-        }
-
-        return preg_match(self::PATTERN_SUPPORTED_URIS, $uri) === 1;
+        return $this->newLinkHelper->hasSupportedScheme($uri);
     }
 
     /**
      * @param string|UriInterface $uri
      * @return string
+     * @deprecated with Neos 9
      */
     public function getScheme($uri): string
     {
-        if ($uri instanceof UriInterface) {
-            return $uri->getScheme();
-        }
-
-        if (preg_match(self::PATTERN_SUPPORTED_URIS, $uri, $matches) === 1) {
-            return $matches[1];
-        }
-
-        return '';
+        return $this->newLinkHelper->getScheme($uri) ?? '';
     }
 
     /**
      * Resolves a given node:// URI to a "normal" HTTP(S) URI for the addressed node.
      *
      * @param string $uri
-     * @param NodeInterface $contextNode
+     * @param Node $contextNode
      * @param ControllerContext $controllerContext
      * @param bool $absolute
      * @return string|null If the node cannot be resolved, null is returned
@@ -161,17 +138,29 @@ class LinkingService
      * @throws \Neos\Flow\Mvc\Routing\Exception\MissingActionNameException
      * @throws \Neos\Flow\Property\Exception
      * @throws \Neos\Flow\Security\Exception
+     * @deprecated with Neos 9
      */
-    public function resolveNodeUri(string $uri, NodeInterface $contextNode, ControllerContext $controllerContext, bool $absolute = false): ?string
-    {
-        $targetObject = $this->convertUriToObject($uri, $contextNode);
-        if ($targetObject === null) {
-            $this->systemLogger->info(sprintf('Could not resolve "%s" to an existing node; The node was probably deleted.', $uri), LogEnvironment::fromMethodName(__METHOD__));
-
+    public function resolveNodeUri(
+        string $uri,
+        Node $contextNode,
+        ControllerContext $controllerContext,
+        bool $absolute = false
+    ): ?string {
+        try {
+            if ($this->newLinkHelper->getScheme($uri) !== 'node') {
+                throw new \RuntimeException(sprintf(
+                    'Invalid node uri "%s" provided. It must start with node://',
+                    $uri
+                ), 1720004437);
+            }
+            return $this->createNodeUri($controllerContext, $uri, $contextNode, null, $absolute);
+        } catch (\RuntimeException $e) {
+            $this->systemLogger->info(
+                sprintf('Could not resolve "%s" to an existing node; %s', $uri, $e->getMessage()),
+                LogEnvironment::fromMethodName(__METHOD__)
+            );
             return null;
         }
-
-        return $this->createNodeUri($controllerContext, $targetObject, null, null, $absolute);
     }
 
     /**
@@ -179,61 +168,51 @@ class LinkingService
      *
      * @param string $uri
      * @return string|null If the URI cannot be resolved, null is returned
+     * @deprecated with Neos 9
      */
     public function resolveAssetUri(string $uri): ?string
     {
-        $targetObject = $this->convertUriToObject($uri);
-        if ($targetObject === null) {
-            $this->systemLogger->info(sprintf('Could not resolve "%s" to an existing asset; The asset was probably deleted.', $uri), LogEnvironment::fromMethodName(__METHOD__));
-
+        try {
+            return $this->newLinkHelper->resolveAssetUri($uri);
+        } catch (\RuntimeException $e) {
+            $this->systemLogger->info(
+                sprintf('Could not resolve "%s" to an existing asset; %s', $uri, $e->getMessage()),
+                LogEnvironment::fromMethodName(__METHOD__)
+            );
             return null;
         }
-
-        return $this->resourceManager->getPublicPersistentResourceUri($targetObject->getResource());
     }
 
     /**
      * Return the object the URI addresses or NULL.
      *
      * @param string|UriInterface $uri
-     * @param NodeInterface $contextNode
-     * @return NodeInterface|AssetInterface|NULL
+     * @param Node $contextNode
+     * @return Node|AssetInterface|NULL
+     * @deprecated with Neos 9
      */
-    public function convertUriToObject($uri, NodeInterface $contextNode = null)
+    public function convertUriToObject($uri, ?Node $contextNode = null)
     {
-        if ($uri instanceof UriInterface) {
-            $uri = (string)$uri;
-        }
-
-        if (preg_match(self::PATTERN_SUPPORTED_URIS, $uri, $matches) === 1) {
-            switch ($matches[1]) {
-                case 'node':
-                    if ($contextNode === null) {
-                        throw new \RuntimeException('node:// URI conversion requires a context node to be passed', 1409734235);
-                    };
-
-                    return $contextNode->getContext()->getNodeByIdentifier($matches[2]);
-                case 'asset':
-                    return $this->assetRepository->findByIdentifier($matches[2]);
-            }
-        }
-
-        return null;
+        return $this->newLinkHelper->convertUriToObject($uri, $contextNode);
     }
 
     /**
      * Renders the URI to a given node instance or -path.
      *
      * @param ControllerContext $controllerContext
-     * @param mixed $node A node object or a string node path, if a relative path is provided the baseNode argument is required
-     * @param NodeInterface $baseNode
+     * @param Node|string|null $node A node object or a string node path,
+     *                    if a relative path is provided the baseNode argument is required
+     * @param Node|null $baseNode
      * @param string $format Format to use for the URL, for example "html" or "json"
      * @param boolean $absolute If set, an absolute URI is rendered
-     * @param array $arguments Additional arguments to be passed to the UriBuilder (for example pagination parameters)
+     * @param array<string,mixed> $arguments Additional arguments to be passed to the UriBuilder
+     *                                       (e.g. pagination parameters)
      * @param string $section
-     * @param boolean $addQueryString If set, the current query parameters will be kept in the URI
-     * @param array $argumentsToBeExcludedFromQueryString arguments to be removed from the URI. Only active if $addQueryString = true
-     * @param boolean $resolveShortcuts @deprecated With Neos 7.0 this argument is no longer evaluated and log a message if set to FALSE
+     * @param boolean $addQueryString If set, the current query parameters will be kept in the URI @deprecated see https://github.com/neos/neos-development-collection/issues/5076
+     * @param array<int,string> $argumentsToBeExcludedFromQueryString arguments to be removed from the URI.
+     *                                                    Only active if $addQueryString = true @deprecated see https://github.com/neos/neos-development-collection/issues/5076
+     * @param boolean $resolveShortcuts @deprecated With Neos 7.0 this argument is no longer evaluated
+     *                                  and log a message if set to FALSE
      * @return string The rendered URI
      * @throws NeosException if no URI could be resolved for the given node
      * @throws \Neos\Flow\Mvc\Routing\Exception\MissingActionNameException
@@ -241,59 +220,110 @@ class LinkingService
      * @throws \Neos\Flow\Security\Exception
      * @throws HttpException
      * @throws \Neos\Flow\Persistence\Exception\IllegalObjectTypeException
+     * @deprecated with Neos 9
      */
-    public function createNodeUri(ControllerContext $controllerContext, $node = null, NodeInterface $baseNode = null, $format = null, $absolute = false, array $arguments = [], $section = '', $addQueryString = false, array $argumentsToBeExcludedFromQueryString = [], $resolveShortcuts = true): string
-    {
+    public function createNodeUri(
+        ControllerContext $controllerContext,
+        $node = null,
+        ?Node $baseNode = null,
+        $format = null,
+        $absolute = false,
+        array $arguments = [],
+        $section = '',
+        $addQueryString = false,
+        array $argumentsToBeExcludedFromQueryString = [],
+        $resolveShortcuts = true
+    ): string {
         $this->lastLinkedNode = null;
         if ($resolveShortcuts === false) {
-            $this->systemLogger->info(sprintf('%s() was called with the "resolveShortCuts" argument set to FALSE. This is no longer supported, the argument was ignored', __METHOD__));
-        }
-        if (!($node instanceof NodeInterface || is_string($node) || $baseNode instanceof NodeInterface)) {
-            throw new \InvalidArgumentException('Expected an instance of NodeInterface or a string for the node argument, or alternatively a baseNode argument.', 1373101025);
+            $this->systemLogger->info(sprintf(
+                '%s() was called with the "resolveShortCuts" argument set to FALSE.'
+                    . ' This is no longer supported, the argument was ignored',
+                __METHOD__
+            ));
         }
 
+        $resolvedNode = null;
         if (is_string($node)) {
-            $nodeString = $node;
-            if ($nodeString === '') {
-                throw new NeosException(sprintf('Empty strings can not be resolved to nodes.'), 1415709942);
+            if (!$baseNode instanceof Node) {
+                throw new \RuntimeException('If "node" is passed as string a base node in must be given', 1719999788);
             }
-            preg_match(NodeInterface::MATCH_PATTERN_CONTEXTPATH, $nodeString, $matches);
-            if (isset($matches['WorkspaceName']) && $matches['WorkspaceName'] !== '') {
-                $node = $this->propertyMapper->convert($nodeString, NodeInterface::class);
-            } else {
-                if ($baseNode === null) {
-                    throw new NeosException('The baseNode argument is required for linking to nodes with a relative path.', 1407879905);
-                }
-                /** @var ContentContext $contentContext */
-                $contentContext = $baseNode->getContext();
-                $normalizedPath = $this->nodeService->normalizePath($nodeString, $baseNode->getPath(), $contentContext->getCurrentSiteNode()->getPath());
-                $node = $contentContext->getNode($normalizedPath);
+
+            $possibleAbsoluteNodePath = $this->legacyNodePathNormalizer->tryResolveLegacyPathSyntaxToAbsoluteNodePath($node, $baseNode);
+            $nodeAddress = $this->nodePathResolver->resolveNodeAddressByPath(
+                $possibleAbsoluteNodePath ?? $node,
+                $baseNode
+            );
+
+            $subgraph = $this->contentRepositoryRegistry->subgraphForNode($baseNode);
+            $resolvedNode = $subgraph->findNodeById($nodeAddress->aggregateId);
+            if ($resolvedNode === null) {
+                throw new \RuntimeException(sprintf(
+                    'Failed to resolve node "%s" (path %s) in workspace "%s" and dimension %s',
+                    $nodeAddress->aggregateId->value,
+                    $node,
+                    $subgraph->getWorkspaceName()->value,
+                    $subgraph->getDimensionSpacePoint()->toJson()
+                ), 1720000002);
             }
-            if (!$node instanceof NodeInterface) {
-                throw new NeosException(sprintf('The string "%s" could not be resolved to an existing node.', $nodeString), 1415709674);
+        } elseif ($node instanceof Node) {
+            $nodeAddress = NodeAddress::fromNode($node);
+            $resolvedNode = $node;
+        } elseif ($node === null) {
+            if (!$baseNode instanceof Node) {
+                throw new \RuntimeException('If "node" is is NULL a base node in must be given', 1719999803);
             }
-        } elseif (!$node instanceof NodeInterface) {
-            $node = $baseNode;
+            $nodeAddress = NodeAddress::fromNode($baseNode);
+            $resolvedNode = $baseNode;
+        } else {
+            throw new \RuntimeException(sprintf(
+                'The "node" argument can only be a string or an instance of `Node`. Given: %s',
+                get_debug_type($node)
+            ), 1601372376);
         }
 
-        if (!$node instanceof NodeInterface) {
-            throw new NeosException(sprintf('Node must be an instance of NodeInterface or string, given "%s".', gettype($node)), 1414772029);
-        }
-        $this->lastLinkedNode = $node;
+        $this->lastLinkedNode = $resolvedNode;
 
-        $request = $controllerContext->getRequest()->getMainRequest();
+        $contentRepository = $this->contentRepositoryRegistry->get($nodeAddress->contentRepositoryId);
+        $workspace = $contentRepository->findWorkspaceByName($nodeAddress->workspaceName);
+
+        $mainRequest = $controllerContext->getRequest()->getMainRequest();
         $uriBuilder = clone $controllerContext->getUriBuilder();
-        $uriBuilder->setRequest($request);
-        $action = $node->getContext()->getWorkspace()->isPublicWorkspace() && !$node->isHidden() ? 'show' : 'preview';
+        $uriBuilder->setRequest($mainRequest);
+        $createLiveUri = $workspace && $nodeAddress->workspaceName->isLive() && !$resolvedNode->tags->contain(NeosSubtreeTag::disabled());
+
+        if ($addQueryString === true) {
+            // legacy feature see https://github.com/neos/neos-development-collection/issues/5076
+            $requestArguments = $mainRequest->getArguments();
+            foreach ($argumentsToBeExcludedFromQueryString as $argumentToBeExcluded) {
+                unset($requestArguments[$argumentToBeExcluded]);
+            }
+            if ($requestArguments !== []) {
+                $arguments = Arrays::arrayMergeRecursiveOverrule($requestArguments, $arguments);
+            }
+        }
+
+        if (!$createLiveUri) {
+            $previewActionUri = $uriBuilder
+                ->reset()
+                ->setSection($section)
+                ->setArguments($arguments)
+                ->setFormat($format ?: $mainRequest->getFormat())
+                ->setCreateAbsoluteUri($absolute)
+                ->uriFor('preview', [], 'Frontend\Node', 'Neos.Neos');
+            return (string)UriHelper::uriWithAdditionalQueryParameters(
+                new Uri($previewActionUri),
+                ['node' => $nodeAddress->toJson()]
+            );
+        }
+
         return $uriBuilder
             ->reset()
             ->setSection($section)
             ->setArguments($arguments)
-            ->setAddQueryString($addQueryString)
-            ->setArgumentsToBeExcludedFromQueryString($argumentsToBeExcludedFromQueryString)
-            ->setFormat($format ?: $request->getFormat())
+            ->setFormat($format ?: $mainRequest->getFormat())
             ->setCreateAbsoluteUri($absolute)
-            ->uriFor($action, ['node' => $node], 'Frontend\Node', 'Neos.Neos');
+            ->uriFor('show', ['node' => $nodeAddress], 'Frontend\Node', 'Neos.Neos');
     }
 
     /**
@@ -302,16 +332,21 @@ class LinkingService
      * @return string
      * @throws NeosException
      * @throws HttpException
+     * @deprecated with Neos 9 - todo find alternative
      */
     public function createSiteUri(ControllerContext $controllerContext, Site $site): string
     {
         $primaryDomain = $site->getPrimaryDomain();
         if ($primaryDomain === null) {
-            throw new NeosException(sprintf('Cannot link to a site "%s" since it has no active domains.', $site->getName()), 1460443524);
+            throw new NeosException(sprintf(
+                'Cannot link to a site "%s" since it has no active domains.',
+                $site->getName()
+            ), 1460443524);
         }
         $httpRequest = $controllerContext->getRequest()->getHttpRequest();
         $requestUri = $httpRequest->getUri();
-        // TODO: Should probably directly use \Neos\Flow\Http\Helper\RequestInformationHelper::getRelativeRequestPath() and even that is tricky.
+        // TODO: Should probably directly use \Neos\Flow\Http\Helper\RequestInformationHelper::getRelativeRequestPath()
+        // and even that is tricky.
         $baseUri = $this->baseUriProvider->getConfiguredBaseUriOrFallbackToCurrentRequest($httpRequest);
         $port = $primaryDomain->getPort() ?: $requestUri->getPort();
         return sprintf(
@@ -327,9 +362,10 @@ class LinkingService
      * Returns the node that was last used to resolve a link to.
      * May return NULL in case no link has been generated or an error occurred on the last linking run.
      *
-     * @return NodeInterface
+     * @return Node
+     * @deprecated with Neos 9
      */
-    public function getLastLinkedNode(): ?NodeInterface
+    public function getLastLinkedNode(): ?Node
     {
         return $this->lastLinkedNode;
     }

@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Domain\Model;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,11 +10,14 @@ namespace Neos\Neos\Domain\Model;
  * source code.
  */
 
-use Neos\Flow\Security\Account;
-use Neos\Party\Domain\Model\Person;
+declare(strict_types=1);
+
+namespace Neos\Neos\Domain\Model;
+
 use Doctrine\ORM\Mapping as ORM;
 use Neos\Flow\Annotations as Flow;
-use Neos\ContentRepository\Domain\Model\UserInterface;
+use Neos\Flow\Security\Account;
+use Neos\Party\Domain\Model\Person;
 
 /**
  * Domain Model of a User
@@ -24,7 +26,7 @@ use Neos\ContentRepository\Domain\Model\UserInterface;
  * @Flow\Scope("prototype")
  * @api
  */
-class User extends Person implements UserInterface
+class User extends Person
 {
     /**
      * Preferences of this user
@@ -35,12 +37,23 @@ class User extends Person implements UserInterface
     protected $preferences;
 
     /**
+     * This property will be introduced and initialised via Flows persistence magic aspect.
+     * @var string
+     */
+    protected $Persistence_Object_Identifier;
+
+    /**
      * Constructs this User object
      */
     public function __construct()
     {
         parent::__construct();
         $this->preferences = new UserPreferences();
+    }
+
+    public function getId(): UserId
+    {
+        return UserId::fromString($this->Persistence_Object_Identifier);
     }
 
     /**

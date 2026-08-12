@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Domain\Model\AssetSource\Neos;
 
 /*
@@ -105,7 +106,7 @@ final class NeosAssetProxyRepository implements AssetProxyRepositoryInterface, S
      * @return void
      * @api
      */
-    public function orderBy(array $orderings):void
+    public function orderBy(array $orderings): void
     {
         $this->assetRepository->setDefaultOrderings($orderings);
     }
@@ -113,7 +114,7 @@ final class NeosAssetProxyRepository implements AssetProxyRepositoryInterface, S
     /**
      * @param AssetTypeFilter $assetType
      */
-    public function filterByType(AssetTypeFilter $assetType = null): void
+    public function filterByType(?AssetTypeFilter $assetType = null): void
     {
         $this->assetTypeFilter = (string)$assetType ?: 'All';
         $this->initializeObject();
@@ -125,7 +126,7 @@ final class NeosAssetProxyRepository implements AssetProxyRepositoryInterface, S
      *
      * @param AssetCollection $assetCollection
      */
-    public function filterByCollection(AssetCollection $assetCollection = null): void
+    public function filterByCollection(?AssetCollection $assetCollection = null): void
     {
         $this->activeAssetCollection = $assetCollection;
     }

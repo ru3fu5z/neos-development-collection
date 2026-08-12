@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Service\Controller;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,14 +10,20 @@ namespace Neos\Neos\Service\Controller;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Service\Controller;
+
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAddress;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Mvc\View\JsonView;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
-use Neos\Utility\ObjectAccess;
 use Neos\Flow\Reflection\ReflectionService;
 use Neos\Neos\Exception as NeosException;
 use Neos\Neos\Service\DataSource\DataSourceInterface;
-use Neos\ContentRepository\Domain\Model\NodeInterface;
+use Neos\Utility\ObjectAccess;
 
 /**
  * Data Source Controller
@@ -27,8 +32,11 @@ use Neos\ContentRepository\Domain\Model\NodeInterface;
  */
 class DataSourceController extends AbstractServiceController
 {
+    #[Flow\Inject]
+    protected ContentRepositoryRegistry $contentRepositoryRegistry;
+
     /**
-     * @var array
+     * @var array<string,class-string>
      */
     protected $viewFormatToObjectNameMap = [
         'json' => JsonView::class
@@ -36,20 +44,21 @@ class DataSourceController extends AbstractServiceController
 
     /**
      * @param string $dataSourceIdentifier
-     * @param NodeInterface $node
-     * @return string
      * @throws NeosException
      */
-    public function indexAction($dataSourceIdentifier, NodeInterface $node = null)
+    public function indexAction($dataSourceIdentifier, ?string $node = null): void
     {
         $dataSources = static::getDataSources($this->objectManager);
 
         if (!isset($dataSources[$dataSourceIdentifier])) {
-            throw new NeosException(sprintf('Data source with identifier "%s" does not exist.', $dataSourceIdentifier), 1414088186);
+            throw new NeosException(sprintf(
+                'Data source with identifier "%s" does not exist.',
+                $dataSourceIdentifier
+            ), 1414088186);
         }
 
-        /** @var $dataSource DataSourceInterface */
-        $dataSource = new $dataSources[$dataSourceIdentifier];
+        /** @var DataSourceInterface $dataSource */
+        $dataSource = $this->objectManager->get($dataSources[$dataSourceIdentifier]);
         if (ObjectAccess::isPropertySettable($dataSource, 'controllerContext')) {
             ObjectAccess::setProperty($dataSource, 'controllerContext', $this->controllerContext);
         }
@@ -58,30 +67,51 @@ class DataSourceController extends AbstractServiceController
         unset($arguments['dataSourceIdentifier']);
         unset($arguments['node']);
 
-        $values = $dataSource->getData($node, $arguments);
+        $values = $dataSource->getData($this->deserializeNodeFromNodeAddress($node), $arguments);
 
         $this->view->assign('value', $values);
+    }
+
+    private function deserializeNodeFromNodeAddress(?string $stringFormattedNodeAddress): ?Node
+    {
+        if (!$stringFormattedNodeAddress) {
+            return null;
+        }
+
+        $nodeAddress = NodeAddress::fromJsonString($stringFormattedNodeAddress);
+
+        $contentRepository = $this->contentRepositoryRegistry->get($nodeAddress->contentRepositoryId);
+        return $contentRepository->getContentSubgraph($nodeAddress->workspaceName, $nodeAddress->dimensionSpacePoint)
+            ->findNodeById($nodeAddress->aggregateId);
     }
 
     /**
      * Get available data source implementations
      *
      * @param ObjectManagerInterface $objectManager
-     * @return array Data source class names indexed by identifier
+     * @return array<string,class-string> Data source class names indexed by identifier
      * @Flow\CompileStatic
      * @throws NeosException
      */
     public static function getDataSources($objectManager)
     {
+        /** @var ReflectionService $reflectionService */
         $reflectionService = $objectManager->get(ReflectionService::class);
 
         $dataSources = [];
-        $dataSourceClassNames = $reflectionService->getAllImplementationClassNamesForInterface(DataSourceInterface::class);
-        /** @var $dataSourceClassName DataSourceInterface */
+        $dataSourceClassNames = $reflectionService->getAllImplementationClassNamesForInterface(
+            DataSourceInterface::class
+        );
         foreach ($dataSourceClassNames as $dataSourceClassName) {
+            /** @var DataSourceInterface $dataSourceClassName */
             $identifier = $dataSourceClassName::getIdentifier();
+            /** @var class-string $dataSourceClassName */
             if (isset($dataSources[$identifier])) {
-                throw new NeosException(sprintf('Data source with identifier "%s" is already defined in class %s.', $identifier, $dataSourceClassName), 1414088185);
+                throw new NeosException(sprintf(
+                    'Data source with identifier "%s" is already defined in class %s.',
+                    $identifier,
+                    $dataSourceClassName
+                ), 1414088185);
             }
             $dataSources[$identifier] = $dataSourceClassName;
         }

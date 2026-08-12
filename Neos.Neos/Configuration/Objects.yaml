@@ -8,12 +8,6 @@ Neos\Neos\ViewHelpers\Backend\ConfigurationCacheVersionViewHelper:
           1:
             value: Neos_Neos_Configuration_Version
 
-Neos\ContentRepository\Domain\Service\ContextFactoryInterface:
-  className: Neos\Neos\Domain\Service\ContentContextFactory
-
-Neos\ContentRepository\Domain\Service\PublishingServiceInterface:
-  className: Neos\Neos\Service\PublishingService
-
 Neos\Neos\Domain\Service\FusionConfigurationCache:
   arguments:
     1:
@@ -26,29 +20,41 @@ Neos\Neos\Domain\Service\FusionConfigurationCache:
     2:
       setting: "Neos.Neos.fusion.enableObjectTreeCache"
 
-'Neos\ContentRepository\Domain\Service\ContentDimensionPresetSourceInterface':
-  className: Neos\Neos\Domain\Service\ConfigurationContentDimensionPresetSource
+Neos\Neos\Domain\Service\FusionAutoIncludeHandler:
+  className: Neos\Neos\Domain\Service\ResourceFusionAutoIncludeHandler
 
-'Neos\ContentRepository\Domain\Service\NodeServiceInterface':
-  className: Neos\Neos\TYPO3CR\NeosNodeService
+Neos\Neos\Domain\Service\WorkspaceService:
+  arguments:
+    7:
+      setting: "Neos.Neos.softRemoval.garbageCollectionGracePeriod"
 
-# This interface extends the Neos\ContentRepository\Domain\Service\NodeServiceInterface
-'Neos\Neos\TYPO3CR\NeosNodeServiceInterface':
-  className: Neos\Neos\TYPO3CR\NeosNodeService
+Neos\Neos\Domain\SubtreeTagging\SoftRemoval\SoftRemovalGarbageCollector:
+  arguments:
+    4:
+      object: 'Neos\ContentRepositoryRegistry\Factory\Clock\SystemClock'
 
-'Neos\Neos\Domain\Service\ContentDimensionPresetSourceInterface':
-  className: Neos\Neos\Domain\Service\ConfigurationContentDimensionPresetSource
+Neos\Neos\Domain\Service\WorkspacePublishingService:
+  arguments:
+    3:
+      setting: "Neos.Neos.softRemoval.garbageCollectionGracePeriod"
 
-Neos\Neos\Domain\Service\ConfigurationContentDimensionPresetSource:
+Neos\Fusion\Core\Cache\RuntimeContentCache:
   properties:
-    configuration:
-      setting: Neos.ContentRepository.contentDimensions
+    serializer:
+      object: Neos\Neos\Fusion\Cache\NeosFusionContextSerializer
 
-Neos\Neos\Routing\FrontendNodeRoutePartHandlerInterface:
-  className: Neos\Neos\Routing\FrontendNodeRoutePartHandler
+Neos\Neos\FrontendRouting\FrontendNodeRoutePartHandlerInterface:
+  className: Neos\Neos\FrontendRouting\EventSourcedFrontendNodeRoutePartHandler
 
-Neos\Neos\Domain\Service\NodeSearchServiceInterface:
-  className: Neos\Neos\Domain\Service\NodeSearchService
+Neos\Flow\Mvc\Routing\RouteValuesNormalizerInterface:
+  className: Neos\Neos\Routing\NeosRouteValueNormalizer
+
+Neos\Neos\FrontendRouting\Projection\DocumentUriPathFinder:
+  arguments:
+    1:
+      object:
+        factoryObjectName: 'Doctrine\ORM\EntityManagerInterface'
+        factoryMethodName: 'getConnection'
 
 Neos\Neos\Service\XliffService:
   properties:
@@ -89,3 +95,11 @@ Neos\Neos\Controller\LoginController:
         arguments:
           1:
             value: Neos_Neos_LoginTokenCache
+
+Neos\Neos\AssetUsage\GlobalAssetUsageService:
+  arguments:
+    3:
+      setting: Neos.Neos.assetUsage.contentRepositories
+
+Neos\Neos\Domain\NodeLabel\NodeLabelGeneratorInterface:
+  className: Neos\Neos\Domain\NodeLabel\DelegatingNodeLabelRenderer

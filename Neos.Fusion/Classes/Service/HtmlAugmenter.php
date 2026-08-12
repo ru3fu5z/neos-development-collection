@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Service;
 
 /*
@@ -42,7 +43,7 @@ class HtmlAugmenter
      * @param array $exclusiveAttributes A list of lowercase(!) attribute names that should be exclusive to the root element. If the existing root element contains one of these a new root element is wrapped
      * @param bool $allowEmptyAttributes Allow empty attributes without a value
      */
-    public function addAttributes($html, array $attributes, $fallbackTagName = 'div', array $exclusiveAttributes = null, bool $allowEmptyAttributes = true)
+    public function addAttributes($html, array $attributes, $fallbackTagName = 'div', ?array $exclusiveAttributes = null, bool $allowEmptyAttributes = true)
     {
         if ($attributes === []) {
             return $html;
@@ -59,11 +60,11 @@ class HtmlAugmenter
      * Detects a unique root tag in the given $html string and returns its DOMNode representation - or NULL if no unique root element could be found
      *
      * @param string $html
-     * @return \DOMNode
+     * @return \DOMNode|null
      */
     protected function getHtmlRootElement($html)
     {
-        $html = trim($html);
+        $html = trim((string)$html);
         if ($html === '') {
             return null;
         }
@@ -129,7 +130,7 @@ class HtmlAugmenter
      * @param array $attributes array of attribute names to check (lowercase)
      * @return boolean true if at least one of the $attributes is contained in the given $element, otherwise false
      */
-    protected function elementHasAttributes(\DOMNode $element, array $attributes = null)
+    protected function elementHasAttributes(\DOMNode $element, ?array $attributes = null)
     {
         if ($attributes === null) {
             return false;

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Neos\Fusion\Core\ExceptionHandlers;
 
 /*
@@ -64,6 +67,7 @@ abstract class AbstractRenderingExceptionHandler
         }
         if ($exception instanceof Exceptions\RuntimeException) {
             $fusionPath = $exception->getFusionPath();
+            /** @var \Exception $exception */
             $exception = $exception->getPrevious();
         }
         if ($this->exceptionDisablesCache($fusionPath, $exception)) {
@@ -78,7 +82,7 @@ abstract class AbstractRenderingExceptionHandler
      *
      * @param string $fusionPath path causing the exception
      * @param \Exception $exception exception to handle
-     * @param integer $referenceCode
+     * @param string|null $referenceCode
      * @return string
      */
     abstract protected function handle($fusionPath, \Exception $exception, $referenceCode);

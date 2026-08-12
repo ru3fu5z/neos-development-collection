@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Neos\Tests\Unit\Service;
 
 /*
@@ -11,18 +12,17 @@ namespace Neos\Neos\Tests\Unit\Service;
  * source code.
  */
 
+use Neos\ContentRepository\Domain\Repository\WorkspaceRepository;
+use Neos\Flow\Persistence\PersistenceManagerInterface;
+use Neos\Flow\Security\Account;
+use Neos\Flow\Security\AccountRepository;
 use Neos\Flow\Security\Context;
 use Neos\Flow\Tests\UnitTestCase;
 use Neos\Neos\Domain\Model\User;
 use Neos\Neos\Domain\Service\UserService as UserDomainService;
-use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Neos\Service\UserService;
 use Neos\Party\Domain\Repository\PartyRepository;
-use Neos\ContentRepository\Domain\Model\Workspace;
-use Neos\ContentRepository\Domain\Repository\WorkspaceRepository;
-use Neos\Flow\Security\AccountRepository;
 use Neos\Party\Domain\Service\PartyService;
-use Neos\Flow\Security\Account;
 
 /**
  * Test case for the UserService
@@ -81,6 +81,7 @@ class UserServiceTest extends UnitTestCase
 
     public function setUp(): void
     {
+        $this->markTestSkipped('TODO - update with Neos 9.0');
         $this->userService = new UserService();
         $this->userDomainService = new UserDomainService();
 
@@ -115,54 +116,6 @@ class UserServiceTest extends UnitTestCase
 
         $this->mockUserDomainService->expects(self::atLeastOnce())->method('getCurrentUser')->will(self::returnValue($mockUser));
         self::assertSame($mockUser, $this->userService->getBackendUser());
-    }
-
-    /**
-     * @test
-     */
-    public function getPersonalWorkspaceReturnsNullIfNoUserIsLoggedIn()
-    {
-        $this->mockUserDomainService->expects(self::atLeastOnce())->method('getCurrentUser')->will(self::returnValue(null));
-        self::assertNull($this->userService->getPersonalWorkspace());
-    }
-
-    /**
-     * @test
-     */
-    public function getPersonalWorkspaceReturnsTheUsersWorkspaceIfAUserIsLoggedIn()
-    {
-        $mockUser = $this->getMockBuilder(User::class)->disableOriginalConstructor()->getMock();
-        $mockUserWorkspace = $this->getMockBuilder(Workspace::class)->disableOriginalConstructor()->getMock();
-        $mockAccount = $this->getMockBuilder(Account::class)->disableOriginalConstructor()->getMock();
-
-        $this->mockSecurityContext->expects(self::atLeastOnce())->method('getAccount')->will(self::returnValue($mockAccount));
-        $this->mockUserDomainService->expects(self::atLeastOnce())->method('getCurrentUser')->will(self::returnValue($mockUser));
-        $this->mockUserDomainService->expects(self::atLeastOnce())->method('getUserName')->with($mockUser)->will(self::returnValue('TheUserName'));
-        $this->mockWorkspaceRepository->expects(self::atLeastOnce())->method('findOneByName')->with('user-TheUserName')->will(self::returnValue($mockUserWorkspace));
-        self::assertSame($mockUserWorkspace, $this->userService->getPersonalWorkspace());
-    }
-
-    /**
-     * @test
-     */
-    public function getPersonalWorkspaceNameReturnsNullIfNoUserIsLoggedIn()
-    {
-        $this->mockUserDomainService->expects(self::atLeastOnce())->method('getCurrentUser')->will(self::returnValue(null));
-        self::assertNull($this->userService->getPersonalWorkspaceName());
-    }
-
-    /**
-     * @test
-     */
-    public function getPersonalWorkspaceNameReturnsTheUsersWorkspaceNameIfAUserIsLoggedIn()
-    {
-        $mockUser = $this->getMockBuilder(User::class)->disableOriginalConstructor()->getMock();
-        $mockAccount = $this->getMockBuilder(Account::class)->disableOriginalConstructor()->getMock();
-
-        $this->mockSecurityContext->expects(self::atLeastOnce())->method('getAccount')->will(self::returnValue($mockAccount));
-        $this->mockUserDomainService->expects(self::atLeastOnce())->method('getCurrentUser')->will(self::returnValue($mockUser));
-        $this->mockUserDomainService->expects(self::atLeastOnce())->method('getUserName')->with($mockUser)->will(self::returnValue('TheUserName'));
-        self::assertSame('user-TheUserName', $this->userService->getPersonalWorkspaceName());
     }
 
     /**

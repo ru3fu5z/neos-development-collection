@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\ViewHelpers\Uri;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,14 +10,24 @@ namespace Neos\Neos\ViewHelpers\Uri;
  * source code.
  */
 
-use Neos\ContentRepository\Domain\Model\NodeInterface;
+declare(strict_types=1);
+
+namespace Neos\Neos\ViewHelpers\Uri;
+
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAddress;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Log\ThrowableStorageInterface;
 use Neos\Flow\Mvc\Exception\NoMatchingRouteException;
 use Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper;
+use Neos\FluidAdaptor\Core\ViewHelper\Exception as ViewHelperException;
 use Neos\Fusion\ViewHelpers\FusionContextTrait;
-use Neos\Neos\Exception as NeosException;
-use Neos\Neos\Service\LinkingService;
+use Neos\Neos\FrontendRouting\NodeUriBuilderFactory;
+use Neos\Neos\FrontendRouting\Options;
+use Neos\Neos\Utility\LegacyNodePathNormalizer;
+use Neos\Neos\Utility\NodePathResolver;
 
 /**
  * A view helper for creating URIs pointing to nodes.
@@ -36,8 +45,6 @@ use Neos\Neos\Service\LinkingService;
  * The given path is treated as a path relative to the current node.
  * Examples: given that the current node is ``/sites/acmecom/products/``,
  * ``stapler`` results in ``/sites/acmecom/products/stapler``,
- * ``../about`` results in ``/sites/acmecom/about/``,
- * ``./neos/info`` results in ``/sites/acmecom/products/neos/info``.
  *
  * *``node`` starts with a tilde character (``~``):*
  * The given path is treated as a path relative to the current site node.
@@ -86,7 +93,6 @@ use Neos\Neos\Service\LinkingService;
  * about/us.html
  * (depending on current workspace, current node, format etc.)
  * </output>
- *
  * @api
  */
 class NodeViewHelper extends AbstractViewHelper
@@ -95,9 +101,9 @@ class NodeViewHelper extends AbstractViewHelper
 
     /**
      * @Flow\Inject
-     * @var LinkingService
+     * @var ContentRepositoryRegistry
      */
-    protected $linkingService;
+    protected $contentRepositoryRegistry;
 
     /**
      * @Flow\Inject
@@ -106,61 +112,140 @@ class NodeViewHelper extends AbstractViewHelper
     protected $throwableStorage;
 
     /**
-     * Initialize the arguments.
+     * @Flow\Inject
+     * @var NodeUriBuilderFactory
+     */
+    protected $nodeUriBuilderFactory;
+
+    /**
+     * @Flow\Inject
+     * @var NodePathResolver
+     */
+    protected $nodePathResolver;
+
+    /**
+     * @Flow\Inject
+     * @var LegacyNodePathNormalizer
+     */
+    protected $legacyNodePathNormalizer;
+
+    /**
+     * Initialize arguments
      *
      * @return void
-     * @throws \Neos\FluidAdaptor\Core\ViewHelper\Exception
+     * @throws ViewHelperException
      */
     public function initializeArguments()
     {
-        parent::initializeArguments();
-        $this->registerArgument('node', 'mixed', 'A node object, a string node path (absolute or relative), a string node://-uri or NULL');
-        $this->registerArgument('format', 'string', 'Format to use for the URL, for example "html" or "json"');
-        $this->registerArgument('absolute', 'boolean', 'If set, an absolute URI is rendered', false, false);
-        $this->registerArgument('arguments', 'array', 'Additional arguments to be passed to the UriBuilder (for example pagination parameters)', false, []);
-        $this->registerArgument('section', 'string', 'The anchor to be added to the URI', false, '');
-        $this->registerArgument('addQueryString', 'boolean', 'If set, the current query parameters will be kept in the URI', false, false);
-        $this->registerArgument('argumentsToBeExcludedFromQueryString', 'array', 'arguments to be removed from the URI. Only active if $addQueryString = true', false, []);
-        $this->registerArgument('baseNodeName', 'string', 'The name of the base node inside the Fusion context to use for the ContentContext or resolving relative paths', false, 'documentNode');
-        $this->registerArgument('resolveShortcuts', 'boolean', 'DEPRECATED Parameter - ignored', false, true);
+        $this->registerArgument(
+            'node',
+            'mixed',
+            'A node object, a string node path (absolute or relative), a string node://-uri or NULL'
+        );
+        $this->registerArgument(
+            'format',
+            'string',
+            'Format to use for the URL, for example "html" or "json"'
+        );
+        $this->registerArgument(
+            'absolute',
+            'boolean',
+            'If set, an absolute URI is rendered',
+            false,
+            false
+        );
+        $this->registerArgument(
+            'arguments',
+            'array',
+            'Additional arguments to be passed to the UriBuilder (for example pagination parameters)',
+            false,
+            []
+        );
+        $this->registerArgument(
+            'section',
+            'string',
+            'The anchor to be added to the URI',
+            false,
+            ''
+        );
+        $this->registerArgument(
+            'baseNodeName',
+            'string',
+            'The name of the base node inside the Fusion context to use for the ContentContext'
+            . ' or resolving relative paths',
+            false,
+            'documentNode'
+        );
+        $this->registerArgument(
+            'nodeVariableName',
+            'string',
+            'The variable the node will be assigned to for the rendered child content',
+            false,
+            'linkedNode'
+        );
     }
 
     /**
      * Renders the URI.
-     *
-     * @return string The rendered URI or NULL if no URI could be resolved for the given node
-     * @throws \Neos\Flow\Mvc\Routing\Exception\MissingActionNameException
-     * @throws \Neos\Flow\Property\Exception
-     * @throws \Neos\Flow\Security\Exception
      */
     public function render(): string
     {
-        $baseNode = null;
         $node = $this->arguments['node'];
-        if (!$node instanceof NodeInterface) {
+        if (is_string($node)) {
             $baseNode = $this->getContextVariable($this->arguments['baseNodeName']);
-            if (is_string($node) && strpos($node, 'node://') === 0) {
-                $node = $this->linkingService->convertUriToObject($node, $baseNode);
+            if (!$baseNode instanceof Node) {
+                throw new ViewHelperException(sprintf(
+                    'If "node" is passed as string a base node in must be set in "%s". Given: %s',
+                    $this->arguments['baseNodeName'],
+                    get_debug_type($baseNode)
+                ), 1719953186);
             }
+
+            if (str_starts_with($node, 'node://')) {
+                $nodeAddress = NodeAddress::fromNode($baseNode)->withAggregateId(
+                    NodeAggregateId::fromString(substr($node, strlen('node://')))
+                );
+            } else {
+                $possibleAbsoluteNodePath = $this->legacyNodePathNormalizer->tryResolveLegacyPathSyntaxToAbsoluteNodePath($node, $baseNode);
+                $nodeAddress = $this->nodePathResolver->resolveNodeAddressByPath(
+                    $possibleAbsoluteNodePath ?? $node,
+                    $baseNode
+                );
+            }
+        } elseif ($node instanceof Node) {
+            $nodeAddress = NodeAddress::fromNode($node);
+        } else {
+            throw new ViewHelperException(sprintf(
+                'The "node" argument can only be a string or an instance of `Node`. Given: %s',
+                get_debug_type($node)
+            ), 1601372376);
         }
 
-        try {
-            return $this->linkingService->createNodeUri(
-                $this->controllerContext,
-                $node,
-                $baseNode,
-                $this->arguments['format'],
-                $this->arguments['absolute'],
-                $this->arguments['arguments'],
-                $this->arguments['section'],
-                $this->arguments['addQueryString'],
-                $this->arguments['argumentsToBeExcludedFromQueryString']
-            );
-        } catch (NeosException $exception) {
-            $this->throwableStorage->logThrowable($exception);
-        } catch (NoMatchingRouteException $exception) {
-            $this->throwableStorage->logThrowable($exception);
+        $nodeUriBuilder = $this->nodeUriBuilderFactory->forActionRequest($this->controllerContext->getRequest());
+
+        $options = $this->arguments['absolute'] ? Options::createForceAbsolute() : Options::createEmpty();
+        $format = $this->arguments['format'] ?: $this->controllerContext->getRequest()->getFormat();
+        if ($format && $format !== 'html') {
+            $options = $options->withCustomFormat($format);
         }
-        return '';
+        if ($routingArguments = $this->arguments['arguments']) {
+            $options = $options->withCustomRoutingArguments($routingArguments);
+        }
+
+        $uri = '';
+        try {
+            $uri = $nodeUriBuilder->uriFor($nodeAddress, $options);
+
+            if ($this->arguments['section'] !== '') {
+                $uri = $uri->withFragment($this->arguments['section']);
+            }
+        } catch (NoMatchingRouteException $e) {
+            $this->throwableStorage->logThrowable(new ViewHelperException(sprintf(
+                'Failed to build URI for node: %s: %s',
+                $nodeAddress->toJson(),
+                $e->getMessage()
+            ), 1601372594, $e));
+        }
+        return (string)$uri;
     }
 }

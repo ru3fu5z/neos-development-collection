@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\Cache;
@@ -13,12 +14,13 @@ namespace Neos\Fusion\Core\Cache;
  * source code.
  */
 
-use Neos\Flow\Annotations as Flow;
 use Neos\Cache\Frontend\VariableFrontend;
+use Neos\Flow\Annotations as Flow;
+use Neos\Flow\Package\FlowPackageInterface;
 use Neos\Flow\Package\PackageManager;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionFile;
-use Neos\Utility\Unicode\Functions as UnicodeFunctions;
 use Neos\Utility\Files;
+use Neos\Utility\Unicode\Functions as UnicodeFunctions;
 
 /**
  * Helper around the ParsePartials Cache.
@@ -44,6 +46,7 @@ class ParserCache
 
     /**
      * @Flow\InjectConfiguration(path="enableParsePartialsCache")
+     * @var boolean
      */
     protected $enableCache;
 
@@ -61,7 +64,12 @@ class ParserCache
         if (str_contains($contextPathAndFilename, 'nodetypes://')) {
             $contextPathAndFilename = $this->getAbsolutePathForNodeTypesUri($contextPathAndFilename);
         }
-        $identifier = $this->getCacheIdentifierForFile($contextPathAndFilename);
+        $fusionFileRealPath = realpath($contextPathAndFilename);
+        if ($fusionFileRealPath === false) {
+            // should not happen as the file would not been able to be read in the first place.
+            throw new \RuntimeException("Couldn't resolve realpath for: '$contextPathAndFilename'", 1705409467);
+        }
+        $identifier = $this->getCacheIdentifierForAbsoluteUnixStyleFilePathWithoutDirectoryTraversal($fusionFileRealPath);
         return $this->cacheForIdentifier($identifier, $generateValueToCache);
     }
 
@@ -76,11 +84,16 @@ class ParserCache
 
     private function cacheForIdentifier(string $identifier, \Closure $generateValueToCache): mixed
     {
-        if ($this->parsePartialsCache->has($identifier)) {
-            return $this->parsePartialsCache->get($identifier);
+        $value = $this->parsePartialsCache->get($identifier);
+        if ($value !== false) {
+            return $value;
         }
         $value = $generateValueToCache();
-        $this->parsePartialsCache->set($identifier, $value);
+        if ($value !== false) {
+            // in the rare edge-case of a fusion dsl returning `false` we cannot cache it,
+            // as the above get would be ignored. This is an acceptable compromise.
+            $this->parsePartialsCache->set($identifier, $value);
+        }
         return $value;
     }
 
@@ -105,6 +118,7 @@ class ParserCache
             throw new \InvalidArgumentException("Unsupported stream wrapper: '$requestedPath'");
         }
 
+        /** @var FlowPackageInterface $package */
         $package = $this->packageManager->getPackage($resourceUriParts['host']);
         return Files::concatenatePaths([$package->getResourcesPath(), $resourceUriParts['path']]);
     }

@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\FusionObjects;
 
 /*
@@ -31,7 +32,7 @@ class CaseImplementation extends AbstractArrayFusionObject
      *
      * You should not rely on the contents or type of this constant.
      */
-    const MATCH_NORESULT = '_____________NO_MATCH_RESULT_____________';
+    public const MATCH_NORESULT = '_____________NO_MATCH_RESULT_____________';
 
     /**
      * Execute each matcher until the first one matches

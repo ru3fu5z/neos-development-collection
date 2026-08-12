@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Service;
 
 /*
@@ -14,9 +15,7 @@ namespace Neos\Fusion\Service;
 use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\DebugMessage;
 
-/**
- * @Flow\Scope("singleton")
- */
+#[Flow\Scope('singleton')]
 class DebugStack
 {
     /**
@@ -40,6 +39,7 @@ class DebugStack
         $this->flush();
         $output = '';
         foreach ($data as $debugMessage) {
+            /** @phpstan-ignore-next-line var_dump is not properly autoloaded */
             $output .= \Neos\Flow\var_dump($debugMessage->getData(), $debugMessage->getTitle(), true, $debugMessage->isPlaintext());
         }
         return $output;

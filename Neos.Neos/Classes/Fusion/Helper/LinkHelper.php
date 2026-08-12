@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Fusion\Helper;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,78 +10,150 @@ namespace Neos\Neos\Fusion\Helper;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Fusion\Helper;
+
+use GuzzleHttp\Psr7\Uri;
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 use Neos\Eel\ProtectedContextAwareInterface;
 use Neos\Flow\Annotations as Flow;
-use Neos\Media\Domain\Model\AssetInterface;
-use Neos\Neos\Service\LinkingService;
 use Neos\Flow\Mvc\Controller\ControllerContext;
-use Neos\ContentRepository\Domain\Model\NodeInterface;
+use Neos\Flow\ResourceManagement\ResourceManager;
+use Neos\Media\Domain\Model\AssetInterface;
+use Neos\Media\Domain\Repository\AssetRepository;
+use Neos\Neos\FrontendRouting\NodeUriBuilderFactory;
+use Neos\Neos\Service\LinkingService;
 use Psr\Http\Message\UriInterface;
+use Psr\Log\LoggerInterface;
 
-/**
- * Eel helper for the linking service
- */
 class LinkHelper implements ProtectedContextAwareInterface
 {
+    private const NODE_SCHEME = 'node';
+    private const ASSET_SCHEME = 'asset';
+
+    /**
+     * @Flow\Inject
+     * @var LoggerInterface
+     */
+    protected $systemLogger;
+
+    /**
+     * @Flow\Inject
+     * @var AssetRepository
+     */
+    protected $assetRepository;
+
+    /**
+     * @Flow\Inject
+     * @var ResourceManager
+     */
+    protected $resourceManager;
+
+    /**
+     * @Flow\Inject
+     * @var ContentRepositoryRegistry
+     */
+    protected $contentRepositoryRegistry;
+
+    /**
+     * @Flow\Inject
+     * @var NodeUriBuilderFactory
+     */
+    protected $nodeUriBuilderFactory;
+
     /**
      * @Flow\Inject
      * @var LinkingService
      */
     protected $linkingService;
 
-    /**
-     * @param string|UriInterface $uri
-     * @return boolean
-     */
-    public function hasSupportedScheme($uri)
+    public function hasSupportedScheme(string|UriInterface|null $uri): bool
     {
-        return $this->linkingService->hasSupportedScheme($uri);
+        $scheme = $this->getScheme($uri);
+        return $scheme === self::NODE_SCHEME || $scheme === self::ASSET_SCHEME;
+    }
+
+    public function getScheme(string|UriInterface|null $uri): ?string
+    {
+        if ($uri === null || $uri === '') {
+            return null;
+        }
+        if (is_string($uri)) {
+            $uri = new Uri($uri);
+        }
+        return $uri->getScheme();
     }
 
     /**
      * @param string|UriInterface $uri
-     * @return string
-     */
-    public function getScheme($uri)
-    {
-        return $this->linkingService->getScheme($uri);
-    }
-
-    /**
-     * @param string|UriInterface $uri
-     * @param NodeInterface $contextNode
+     * @param Node $contextNode
      * @param ControllerContext $controllerContext
-     * @return string
+     * @return string|null
+     * @deprecated with Neos 9 as the linking service is deprecated and this helper cannot be invoked from Fusion either way as the $controllerContext is not available.
      */
-    public function resolveNodeUri($uri, NodeInterface $contextNode, ControllerContext $controllerContext)
+    public function resolveNodeUri(string|UriInterface $uri, Node $contextNode, ControllerContext $controllerContext): ?string
     {
-        return $this->linkingService->resolveNodeUri($uri, $contextNode, $controllerContext);
+        return $this->linkingService->resolveNodeUri((string)$uri, $contextNode, $controllerContext);
     }
 
-    /**
-     * @param string|UriInterface $uri
-     * @return string
-     */
-    public function resolveAssetUri($uri)
+    public function resolveAssetUri(string|UriInterface $uri): string
     {
-        return $this->linkingService->resolveAssetUri($uri);
+        if (!$uri instanceof UriInterface) {
+            $uri = new Uri($uri);
+        }
+        if ($uri->getScheme() !== self::ASSET_SCHEME) {
+            throw new \RuntimeException(sprintf(
+                'Invalid asset uri "%s" provided. It must start with asset://',
+                $uri
+            ), 1720003716);
+        }
+
+        $asset = $this->assetRepository->findByIdentifier($uri->getHost());
+        if (!$asset instanceof AssetInterface) {
+            throw new \RuntimeException(sprintf(
+                'Failed to resolve asset from URI "%s", probably the corresponding asset was deleted',
+                $uri
+            ), 1601373937);
+        }
+
+        $assetUri = $this->resourceManager->getPublicPersistentResourceUri($asset->getResource());
+
+        return is_string($assetUri) ? $assetUri : '';
     }
 
-    /**
-     * @param string|UriInterface $uri
-     * @param NodeInterface $contextNode
-     * @return NodeInterface|AssetInterface|NULL
-     */
-    public function convertUriToObject($uri, NodeInterface $contextNode = null)
-    {
-        return $this->linkingService->convertUriToObject($uri, $contextNode);
+    public function convertUriToObject(
+        string|UriInterface $uri,
+        ?Node $contextNode = null
+    ): Node|AssetInterface|null {
+        if (is_string($uri)) {
+            $uri = new Uri($uri);
+        }
+        switch ($uri->getScheme()) {
+            case self::NODE_SCHEME:
+                if ($contextNode === null) {
+                    throw new \RuntimeException(
+                        sprintf('node:// URI conversion like "%s" requires a context node to be passed', $uri),
+                        1409734235
+                    );
+                }
+                return $this->contentRepositoryRegistry->subgraphForNode($contextNode)
+                    ->findNodeById(NodeAggregateId::fromString($uri->getHost()));
+            case self::ASSET_SCHEME:
+                /** @var AssetInterface|null $asset */
+                $asset = $this->assetRepository->findByIdentifier($uri->getHost());
+                return $asset;
+        }
+        return null;
     }
 
     /**
      * @param string $methodName
      * @return boolean
      */
-    public function allowsCallOfMethod($methodName)
+    public function allowsCallOfMethod($methodName): bool
     {
         return true;
     }

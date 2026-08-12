@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\TypeConverter;
 
 /*
@@ -53,7 +54,7 @@ class TagConverter extends PersistentObjectConverter
      * @throws UnknownObjectException
      * @throws InvalidTargetException
      */
-    public function convertFrom($source, $targetType, array $convertedChildProperties = [], PropertyMappingConfigurationInterface $configuration = null)
+    public function convertFrom($source, $targetType, array $convertedChildProperties = [], ?PropertyMappingConfigurationInterface $configuration = null)
     {
         $object = parent::convertFrom($source, $targetType, $convertedChildProperties, $configuration);
 

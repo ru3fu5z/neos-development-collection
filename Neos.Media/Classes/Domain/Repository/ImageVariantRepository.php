@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\Repository;
@@ -31,7 +32,7 @@ class ImageVariantRepository extends AssetRepository
     /**
      * @return ImageVariant[]
      */
-    public function findVariantsByIdentifierAndVariantName(string $identifier, string $variantName, int $limit = null): array
+    public function findVariantsByIdentifierAndVariantName(string $identifier, string $variantName, ?int $limit = null): array
     {
         $queryBuilder = $this->entityManager->createQueryBuilder()
             ->select('iv')
@@ -52,7 +53,7 @@ class ImageVariantRepository extends AssetRepository
     /**
      * @return ImageVariant[]
      */
-    public function findAllWithOutdatedPresets(int $limit = null): array
+    public function findAllWithOutdatedPresets(?int $limit = null): array
     {
         $queryBuilder = $this->entityManager->createQueryBuilder()
             ->select('iv')

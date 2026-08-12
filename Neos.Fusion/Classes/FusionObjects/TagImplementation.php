@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\FusionObjects;
 
 /*
@@ -63,7 +64,7 @@ class TagImplementation extends AbstractFusionObject
      */
     public function isSelfClosingTag($tagName)
     {
-        return in_array($tagName, self::$SELF_CLOSING_TAGS, true) || (boolean)$this->fusionValue('selfClosingTag');
+        return in_array($tagName, self::$SELF_CLOSING_TAGS, true) || $this->fusionValue('selfClosingTag');
     }
 
 
@@ -99,7 +100,7 @@ class TagImplementation extends AbstractFusionObject
         if ($allowEmpty === null) {
             return true;
         } else {
-            return (boolean)$allowEmpty;
+            return (bool)$allowEmpty;
         }
     }
 

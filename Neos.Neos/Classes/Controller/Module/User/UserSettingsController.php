@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace Neos\Neos\Controller\Module\User;
 
 /*
@@ -12,8 +14,8 @@ namespace Neos\Neos\Controller\Module\User;
  * source code.
  */
 
-use Neos\Flow\Annotations as Flow;
 use Neos\Error\Messages\Message;
+use Neos\Flow\Annotations as Flow;
 use Neos\Flow\I18n\EelHelper\TranslationHelper;
 use Neos\Flow\I18n\Translator;
 use Neos\Flow\Property\PropertyMappingConfiguration;
@@ -215,7 +217,7 @@ class UserSettingsController extends AbstractModuleController
         $this->userService->updateUser($user);
 
         $this->addFlashMessage(
-            $this->translator->translateById('userSettings.electronicAddressRemoved.body', [htmlspecialchars($electronicAddress->getIdentifier()), htmlspecialchars($electronicAddress->getType()), htmlspecialchars($user->getName())], null, null, 'Modules', 'Neos.Neos'),
+            $this->translator->translateById('userSettings.electronicAddressRemoved.body', [htmlspecialchars($electronicAddress->getIdentifier()), htmlspecialchars($electronicAddress->getType()), htmlspecialchars((string)$user->getName())], null, null, 'Modules', 'Neos.Neos'),
             $this->translator->translateById('userSettings.electronicAddressRemoved.title', [], null, null, 'Modules', 'Neos.Neos'),
             Message::SEVERITY_NOTICE,
             [],

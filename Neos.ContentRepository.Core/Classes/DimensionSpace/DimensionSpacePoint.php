@@ -1,0 +1,109 @@
+<?php
+
+/*
+ * This file is part of the Neos.ContentRepository.DimensionSpace package.
+ *
+ * (c) Contributors of the Neos Project - www.neos.io
+ *
+ * This package is Open Source Software. For the full copyright and license
+ * information, please view the LICENSE file which was distributed with this
+ * source code.
+ */
+
+declare(strict_types=1);
+
+namespace Neos\ContentRepository\Core\DimensionSpace;
+
+use Neos\ContentRepository\Core\Dimension;
+
+/**
+ * A point in the dimension space with coordinates DimensionName => DimensionValue.
+ * E.g.: ["language" => "es", "country" => "ar"]
+ * @api
+ */
+final class DimensionSpacePoint extends AbstractDimensionSpacePoint
+{
+    /**
+     * @var array<string,DimensionSpacePoint>
+     */
+    private static array $instances = [];
+
+    /**
+     * @param array<string,string> $coordinates
+     */
+    private static function instance(array $coordinates): self
+    {
+        $hash = parent::hashCoordinates($coordinates);
+        if (!isset(self::$instances[$hash])) {
+            parent::validateCoordinates($coordinates);
+            self::$instances[$hash] = new self($coordinates, $hash);
+        }
+
+        return self::$instances[$hash];
+    }
+
+    /**
+     * @param array<string,string> $data
+     */
+    public static function fromArray(array $data): self
+    {
+        return self::instance($data);
+    }
+
+    /**
+     * Creates a dimension space point from a JSON string representation
+     * See jsonSerialize
+     */
+    public static function fromJsonString(string $jsonString): self
+    {
+        try {
+            return self::instance(json_decode($jsonString, true, 512, JSON_THROW_ON_ERROR));
+        } catch (\JsonException $e) {
+            throw new \RuntimeException(
+                sprintf('Failed to JSON-decode "%s": %s', $jsonString, $e->getMessage()),
+                1782715336,
+                $e
+            );
+        }
+    }
+
+    /**
+     * Creates a dimension space point for a zero-dimensional content repository.
+     *
+     * This applies to content repositories without any dimensions configured.
+     */
+    public static function createWithoutDimensions(): self
+    {
+        return self::fromArray([]);
+    }
+
+    /**
+     * Creates a dimension space point from a legacy dimension array in format
+     * ['language' => ['es'], 'country' => ['ar']]
+     *
+     * @deprecated should be only used for conversion from Neos <= 8.x to 9.x upwards. never use this in "modern" code.
+     * @param array<string,array<int,string>> $legacyDimensionValues
+     */
+    final public static function fromLegacyDimensionArray(array $legacyDimensionValues): self
+    {
+        $coordinates = [];
+        foreach ($legacyDimensionValues as $dimensionName => $rawDimensionValues) {
+            /** @var string $primaryDimensionValue */
+            $primaryDimensionValue = reset($rawDimensionValues);
+            $coordinates[$dimensionName] = $primaryDimensionValue;
+        }
+
+        return self::instance($coordinates);
+    }
+
+    /**
+     * Varies a dimension space point in a single coordinate
+     */
+    final public function vary(Dimension\ContentDimensionId $dimensionId, string $value): self
+    {
+        $variedCoordinates = $this->coordinates;
+        $variedCoordinates[$dimensionId->value] = $value;
+
+        return self::instance($variedCoordinates);
+    }
+}

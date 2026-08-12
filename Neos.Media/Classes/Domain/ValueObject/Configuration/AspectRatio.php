@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\ValueObject\Configuration;
@@ -53,7 +54,7 @@ final class AspectRatio
             throw new \InvalidArgumentException(sprintf('Invalid aspect ratio specified ("%s").', $ratio), 1552641724);
         }
         [$width, $height] = explode(':', $ratio);
-        return new static((int)$width, (int)$height);
+        return new self((int)$width, (int)$height);
     }
 
     /**

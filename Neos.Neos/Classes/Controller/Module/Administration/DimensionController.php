@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Controller\Module\Administration;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,47 +10,54 @@ namespace Neos\Neos\Controller\Module\Administration;
  * source code.
  */
 
-use Neos\ContentRepository\Service\FallbackGraphService;
+declare(strict_types=1);
+
+namespace Neos\Neos\Controller\Module\Administration;
+
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 use Neos\Flow\Annotations as Flow;
 use Neos\Neos\Controller\Module\AbstractModuleController;
-use Neos\Neos\Presentation\Model\Svg;
+use Neos\Neos\FrontendRouting\SiteDetection\SiteDetectionResult;
+use Neos\Neos\Presentation\Dimensions\VisualInterDimensionalVariationGraph;
+use Neos\Neos\Presentation\Dimensions\VisualIntraDimensionalVariationGraph;
 
 /**
  * The Neos Dimension module controller
  */
 class DimensionController extends AbstractModuleController
 {
-    /**
-     * @Flow\Inject
-     * @var FallbackGraphService
-     */
-    protected $fallbackGraphService;
+    #[Flow\Inject]
+    protected ContentRepositoryRegistry $contentRepositoryRegistry;
 
-    /**
-     * @param string $type
-     * @param string $subgraphIdentifier
-     * @return void
-     */
-    public function indexAction(string $type = 'intraDimension', string $subgraphIdentifier = null)
+    public function indexAction(string $type = 'intraDimension', ?string $dimensionSpacePointHash = null): void
     {
-        switch ($type) {
-            case 'intraDimension':
-                $graph = new Svg\IntraDimensionalFallbackGraph($this->fallbackGraphService->getIntraDimensionalFallbackGraph());
-                break;
-            case 'interDimension':
-                $graph = new Svg\InterDimensionalFallbackGraph(
-                    $this->fallbackGraphService->getInterDimensionalFallbackGraph(),
-                    $this->fallbackGraphService->getIntraDimensionalFallbackGraph(),
-                    $subgraphIdentifier
-                );
-                break;
-            default:
-                $graph = null;
-        }
+        $contentRepositoryId = SiteDetectionResult::fromRequest($this->request->getHttpRequest())
+            ->contentRepositoryId;
+        $contentRepository = $this->contentRepositoryRegistry->get($contentRepositoryId);
+
+        $dimensionSpacePoint = $dimensionSpacePointHash
+            ? $contentRepository->getVariationGraph()->getDimensionSpacePoints()[$dimensionSpacePointHash]
+            : null;
+        $graph = match ($type) {
+            'intraDimension' => VisualIntraDimensionalVariationGraph::fromContentDimensionSource(
+                $contentRepository->getContentDimensionSource()
+            ),
+            'interDimension' => $dimensionSpacePoint
+                ? VisualInterDimensionalVariationGraph::forInterDimensionalVariationSubgraph(
+                    $contentRepository->getVariationGraph(),
+                    $dimensionSpacePoint
+                )
+                : VisualInterDimensionalVariationGraph::forInterDimensionalVariationGraph(
+                    $contentRepository->getVariationGraph(),
+                    $contentRepository->getContentDimensionSource()
+                ),
+            default => null,
+        };
+
         $this->view->assignMultiple([
             'availableGraphTypes' => ['intraDimension', 'interDimension'],
             'type' => $type,
-            'selectedSubgraphIdentifier' => $subgraphIdentifier,
+            'selectedDimensionSpacePointHash' => $dimensionSpacePointHash,
             'graph' => $graph
         ]);
     }

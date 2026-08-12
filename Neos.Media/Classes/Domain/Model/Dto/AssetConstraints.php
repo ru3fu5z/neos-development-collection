@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Neos\Media\Domain\Model\Dto;
 
 use Neos\Flow\Annotations as Flow;
@@ -205,7 +207,7 @@ final class AssetConstraints
      * @param string|null $assetType
      * @return AssetTypeFilter
      */
-    public function applyToAssetTypeFilter(string $assetType = null): AssetTypeFilter
+    public function applyToAssetTypeFilter(?string $assetType = null): AssetTypeFilter
     {
         if (!$this->hasMediaTypeConstraint() || in_array($assetType, $this->allowedAssetTypes, true)) {
             return new AssetTypeFilter($assetType ?? 'All');

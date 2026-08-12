@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Afx\Parser;
@@ -51,6 +52,11 @@ class Lexer
         $this->string = $string;
         $this->currentCharacter = ($string !== '') ? $string[0] : null;
         $this->characterPosition = 0;
+    }
+
+    public function getCharacterPosition(): int
+    {
+        return $this->characterPosition;
     }
 
     /**

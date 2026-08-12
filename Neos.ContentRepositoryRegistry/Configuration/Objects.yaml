@@ -1,0 +1,29 @@
+
+# This adds a soft-dependency to the neos/contentgraph-doctrinedbaladapter package
+Neos\ContentGraph\DoctrineDbalAdapter\DoctrineDbalContentGraphProjectionFactory:
+  scope: singleton
+  factoryObjectName: 'Neos\ContentRepositoryRegistry\Infrastructure\GenericObjectFactory'
+  arguments:
+    1:
+      value: 'Neos\ContentGraph\DoctrineDbalAdapter\DoctrineDbalContentGraphProjectionFactory'
+    2:
+      object: 'Doctrine\DBAL\Connection'
+
+# This adds a soft-dependency to the neos/contentgraph-doctrinedbaladapter package
+Neos\ContentRepository\Core\Projection\ContentGraph\ProjectionIntegrityViolationDetectionRunnerFactoryInterface:
+  scope: singleton
+  factoryObjectName: 'Neos\ContentRepositoryRegistry\Infrastructure\GenericObjectFactory'
+  arguments:
+    1:
+      value: 'Neos\ContentGraph\DoctrineDbalAdapter\DoctrineDbalProjectionIntegrityViolationDetectionRunnerFactory'
+    2:
+      object: 'Doctrine\DBAL\Connection'
+
+'Neos.ContentRepositoryRegistry:Logger':
+  className: Psr\Log\LoggerInterface
+  scope: singleton
+  factoryObjectName: Neos\Flow\Log\PsrLoggerFactoryInterface
+  factoryMethodName: get
+  arguments:
+    1:
+      value: contentRepositoryLogger

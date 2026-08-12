@@ -6,43 +6,63 @@
     ],
     "type": "neos-package-collection",
     "require": {
-        "neos/flow-development-collection": "8.3.x-dev",
-        "neos/neos-setup": "^1.0",
-        "php": "^8.0",
+        "neos/flow-development-collection": "9.2.x-dev",
+        "doctrine/dbal": "^3.1.4",
+        "doctrine/migrations": "*",
+        "neos/eventstore": "~2.0",
+        "php": "^8.4",
+        "neos/error-messages": "*",
+        "neos/utility-objecthandling": "*",
+        "neos/utility-arrays": "*",
+        "symfony/serializer": "^6.3",
+        "psr/clock": "^1",
+        "behat/transliterator": "~1.0",
+        "ramsey/uuid": "^3.0 || ^4.0",
+        "neos/eventstore-doctrineadapter": "~3.0",
+        "league/flysystem": "^3",
+        "webmozart/assert": "^1.11",
         "neos/flow": "*",
+        "behat/behat": "^3.5",
+        "neos/behat": "~9.2.0",
+        "neos/contentrepositoryregistry-storageclient": "self.version",
+        "symfony/property-access": "^5.4|^6.0",
+        "neos/fluid-adaptor": "*",
         "neos/cache": "*",
         "neos/eel": "*",
-        "neos/fluid-adaptor": "*",
-        "neos/utility-objecthandling": "*",
-        "neos/utility-files": "*",
-        "neos/utility-arrays": "*",
-        "doctrine/orm": "^2.6",
-        "gedmo/doctrine-extensions": "^3.5",
-        "behat/transliterator": "~1.0",
         "neos/utility-unicode": "*",
+        "doctrine/orm": "^2.14.0",
         "ext-dom": "*",
+        "ext-libxml": "*",
+        "neos/utility-files": "*",
         "neos/utility-mediatypes": "*",
-        "neos/error-messages": "*",
         "doctrine/common": "^2.7 || ^3.0",
+        "enshrined/svg-sanitize": "^0.22.0",
         "neos/imagine": "^3.1.0",
         "imagine/imagine": "*",
-        "doctrine/dbal": "^2.8",
-        "neos/party": "*",
-        "neos/twitter-bootstrap": "*",
-        "neos/fusion-form": "^1.0 || ^2.0",
+        "neos/party": "~7.0.3",
+        "neos/fusion-form": "^2.1 || ^3.0",
         "neos/form": "*",
-        "neos/kickstarter": "~8.3.0"
+        "neos/kickstarter": "~9.2.0"
     },
     "replace": {
-        "typo3/typo3cr": "self.version",
         "packagefactory/atomicfusion-afx": "*",
         "typo3/typoscript": "self.version",
         "typo3/media": "self.version",
         "typo3/neos": "self.version",
         "typo3/neos-nodetypes": "self.version",
         "typo3/neos-kickstarter": "self.version",
-        "neos/cli-setup": "self.version",
-        "neos/content-repository": "self.version",
+        "neos/contentgraph-doctrinedbaladapter": "self.version",
+        "neos/contentrepository-behavioraltests": "self.version",
+        "neos/contentrepository-core": "self.version",
+        "neos/contentrepository-dbal": "self.version",
+        "neos/contentrepository-export": "self.version",
+        "neos/contentrepository-legacynodemigration": "self.version",
+        "neos/contentrepository-nodeaccess": "self.version",
+        "neos/contentrepository-nodemigration": "self.version",
+        "neos/contentrepository-structureadjustment": "self.version",
+        "neos/contentrepository-testsuite": "self.version",
+        "neos/contentrepositoryregistry-testsuite": "self.version",
+        "neos/contentrepositoryregistry": "self.version",
         "neos/diff": "self.version",
         "neos/fusion-afx": "self.version",
         "neos/fusion": "self.version",
@@ -57,21 +77,101 @@
         "neos/nodetypes-html": "self.version",
         "neos/nodetypes-navigation": "self.version",
         "neos/nodetypes": "self.version",
-        "neos/site-kickstarter": "self.version"
+        "neos/site-kickstarter": "self.version",
+        "neos/timeable-node-visibility": "self.version",
+        "neos/workspace-ui": "self.version"
     },
     "suggest": {
         "neos/utility-schema": "Validate NodeType schema.",
+        "league/flysystem-ziparchive": "to export zip archives",
+        "neos/media": "to import Assets",
+        "neos/escr-asset-usage": "to export used assets",
+        "phpunit/phpunit": "to run assertions in the steps (>=9.6 <13)",
+        "neos/contentrepository-structureadjustment": "for certain steps",
+        "neos/contentrepository-nodemigration": "for certain steps",
         "phpbench/phpbench": "For running performance benchmarks of the Fusion runtime",
         "neos/site-kickstarter": "Helps with creating new site packages for Neos.",
         "neos/redirecthandler-neosadapter": "Adds automatic redirects for moved/renamed pages"
     },
+    "scripts": {
+        "lint:php-cs-fixer": "../../bin/php-cs-fixer check -v",
+        "lint:phpstan": "../../bin/phpstan analyse -v",
+        "lint:phpstan-generate-baseline": "../../bin/phpstan analyse --generate-baseline",
+        "lint:distributionintegrity": "[ -d 'Neos.ContentRepository' ] && { echo 'Package Neos.ContentRepository should not exist.' 1>&2; exit 1; } || exit 0;",
+        "lint": [
+            "@lint:php-cs-fixer",
+            "@lint:phpstan",
+            "@lint:distributionintegrity"
+        ],
+        "test:unit": [
+            "../../bin/phpunit --colors --stop-on-failure -c ../../Build/BuildEssentials/PhpUnit/UnitTests.xml Neos.ContentRepository.Core/Tests/Unit",
+            "../../bin/phpunit --colors --stop-on-failure -c ../../Build/BuildEssentials/PhpUnit/UnitTests.xml Neos.ContentRepositoryRegistry/Tests/Unit"
+        ],
+        "test:paratest-cli": "FLOW_CONTEXT=Testing ../../bin/paratest --debug -v --functional --processes 2 --colors --stop-on-failure -c ../../Build/BuildEssentials/PhpUnit/FunctionalTests.xml",
+        "test:parallel": [
+            "for f in Neos.ContentRepository.BehavioralTests/Tests/Parallel/**/*Test.php; do composer test:paratest-cli $f || exit 1; done"
+        ],
+        "test:behat-cli": "../../bin/behat -f progress --strict --no-interaction",
+        "test:behavioral": [
+            "@test:behat-cli -c Neos.ContentRepository.BehavioralTests/Tests/Behavior/behat.yml.dist",
+            "@test:behat-cli -c Neos.ContentRepository.LegacyNodeMigration/Tests/Behavior/behat.yml.dist",
+            "@test:behat-cli -c Neos.ContentRepository.Export/Tests/Behavior/behat.yml.dist",
+            "@test:behat-cli -c Neos.TimeableNodeVisibility/Tests/Behavior/behat.yml.dist",
+            "@test:behat-cli -c Neos.Neos/Tests/Behavior/behat.yml.dist",
+            "@test:behat-cli -c Neos.Workspace.Ui/Tests/Behavior/behat.yml.dist"
+        ],
+        "test:behavioral-maria-mysql": [
+            "@test:behat-cli -c Neos.ContentGraph.DoctrineDbalAdapter/Tests/Behavior/behat.yml.dist",
+            "@test:behat-cli -c Neos.ContentRepositoryRegistry/Tests/Behavior/behat.yml.dist"
+        ],
+        "test": [
+            "@test:unit",
+            "@test:behavioral",
+            "@test:parallel"
+        ],
+        "fix:php-cs-fixer": "../../bin/php-cs-fixer fix",
+        "fix": [
+            "@fix:php-cs-fixer"
+        ],
+        "build:composer-json": "php ../../Build/BuildEssentials/ComposerManifestMerger.php"
+    },
     "autoload": {
         "psr-4": {
-            "Neos\\CliSetup\\": [
-                "Neos.CliSetup/Classes"
+            "Neos\\ContentGraph\\DoctrineDbalAdapter\\": [
+                "Neos.ContentGraph.DoctrineDbalAdapter/src"
             ],
-            "Neos\\ContentRepository\\": [
-                "Neos.ContentRepository/Classes"
+            "Neos\\ContentRepository\\BehavioralTests\\": [
+                "Neos.ContentRepository.BehavioralTests/Classes"
+            ],
+            "Neos\\ContentRepository\\Core\\": [
+                "Neos.ContentRepository.Core/Classes"
+            ],
+            "Neos\\ContentRepository\\Dbal\\": [
+                "Neos.ContentRepository.Dbal/Classes"
+            ],
+            "Neos\\ContentRepository\\Export\\": [
+                "Neos.ContentRepository.Export/src/"
+            ],
+            "Neos\\ContentRepository\\LegacyNodeMigration\\": [
+                "Neos.ContentRepository.LegacyNodeMigration/Classes"
+            ],
+            "Neos\\ContentRepository\\NodeAccess\\": [
+                "Neos.ContentRepository.NodeAccess/Classes"
+            ],
+            "Neos\\ContentRepository\\NodeMigration\\": [
+                "Neos.ContentRepository.NodeMigration/src"
+            ],
+            "Neos\\ContentRepository\\StructureAdjustment\\": [
+                "Neos.ContentRepository.StructureAdjustment/src"
+            ],
+            "Neos\\ContentRepository\\TestSuite\\": [
+                "Neos.ContentRepository.TestSuite/Classes"
+            ],
+            "Neos\\ContentRepositoryRegistry\\TestSuite\\": [
+                "Neos.ContentRepositoryRegistry.TestSuite/Classes"
+            ],
+            "Neos\\ContentRepositoryRegistry\\": [
+                "Neos.ContentRepositoryRegistry/Classes"
             ],
             "Neos\\Diff\\": [
                 "Neos.Diff/Classes"
@@ -117,6 +217,12 @@
             ],
             "Neos\\SiteKickstarter\\": [
                 "Neos.SiteKickstarter/Classes"
+            ],
+            "Neos\\TimeableNodeVisibility\\": [
+                "Neos.TimeableNodeVisibility/Classes"
+            ],
+            "Neos\\Workspace\\Ui\\": [
+                "Neos.Workspace.Ui/Classes"
             ]
         }
     },
@@ -132,10 +238,40 @@
             "manage-resources": true
         }
     },
+    "provide": {
+        "neos/contentrepositoryregistry-storageclient": "self.version"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "brianium/paratest": "^6.11",
+        "roave/security-advisories": "dev-latest",
+        "phpstan/phpstan": "^1.11",
+        "squizlabs/php_codesniffer": "^3.6",
+        "neos/behat": "*",
+        "league/flysystem-memory": "^3"
+    },
     "autoload-dev": {
         "psr-4": {
-            "Neos\\ContentRepository\\Tests\\": [
-                "Neos.ContentRepository/Tests"
+            "Neos\\ContentRepository\\BehavioralTests\\Tests\\": [
+                "Neos.ContentRepository.BehavioralTests/Tests"
+            ],
+            "Neos\\ContentRepository\\Core\\Tests\\": [
+                "Neos.ContentRepository.Core/Tests"
+            ],
+            "Neos\\ContentRepository\\LegacyNodeMigration\\Tests\\": [
+                "Neos.ContentRepository.LegacyNodeMigration/Tests"
+            ],
+            "Neos\\ContentRepository\\NodeAccess\\Tests\\": [
+                "Neos.ContentRepository.NodeAccess/Tests"
+            ],
+            "Neos\\ContentRepository\\NodeMigration\\Tests\\": [
+                "Neos.ContentRepository.NodeMigration/Tests"
+            ],
+            "Neos\\ContentRepository\\StructureAdjustment\\Tests\\": [
+                "Neos.ContentRepository.StructureAdjustment/Tests"
+            ],
+            "Neos\\ContentRepositoryRegistry\\Tests\\": [
+                "Neos.ContentRepositoryRegistry/Tests"
             ],
             "Neos\\Fusion\\Afx\\Tests\\": [
                 "Neos.Fusion.Afx/Tests"
@@ -151,10 +287,13 @@
             ],
             "Neos\\SiteKickstarter\\Tests\\": [
                 "Neos.SiteKickstarter/Tests"
+            ],
+            "Neos\\TimeableNodeVisibility\\Tests\\": [
+                "Neos.TimeableNodeVisibility/Tests"
+            ],
+            "Neos\\Workspace\\Ui\\Tests\\": [
+                "Neos.Workspace.Ui/Tests"
             ]
         }
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^9.0"
     }
 }

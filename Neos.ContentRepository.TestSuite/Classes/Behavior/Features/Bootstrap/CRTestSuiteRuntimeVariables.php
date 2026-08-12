@@ -1,0 +1,137 @@
+<?php
+
+/*
+ * This file is part of the Neos.ContentRepository.TestSuite package.
+ *
+ * (c) Contributors of the Neos Project - www.neos.io
+ *
+ * This package is Open Source Software. For the full copyright and license
+ * information, please view the LICENSE file which was distributed with this
+ * source code.
+ */
+
+declare(strict_types=1);
+
+namespace Neos\ContentRepository\TestSuite\Behavior\Features\Bootstrap;
+
+use Neos\ContentRepository\Core\ContentRepository;
+use Neos\ContentRepository\Core\DimensionSpace\DimensionSpacePoint;
+use Neos\ContentRepository\Core\Feature\Security\Dto\UserId;
+use Neos\ContentRepository\Core\Projection\ContentGraph\ContentSubgraphInterface;
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\Projection\ContentGraph\NodeAggregate;
+use Neos\ContentRepository\Core\Projection\ContentGraph\NodePath;
+use Neos\ContentRepository\Core\Projection\ContentGraph\VisibilityConstraints;
+use Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAggregateId;
+use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
+use Neos\ContentRepository\TestSuite\Fakes\FakeAuthProvider;
+use Neos\ContentRepository\TestSuite\Fakes\FakeClock;
+
+/**
+ * The node creation trait for behavioral tests
+ */
+trait CRTestSuiteRuntimeVariables
+{
+    protected ?ContentRepository $currentContentRepository = null;
+
+    protected ?WorkspaceName $currentWorkspaceName = null;
+
+    protected ?DimensionSpacePoint $currentDimensionSpacePoint = null;
+
+    protected ?NodeAggregateId $currentRootNodeAggregateId = null;
+
+    protected ?\Exception $lastCommandException = null;
+
+    protected ?Node $currentNode = null;
+
+    protected ?NodeAggregate $currentNodeAggregate = null;
+
+    /**
+     * @var array<string,NodeAggregateId>
+     */
+    protected array $rememberedNodeAggregateIds = [];
+
+    /**
+     * @Given /^I am in content repository "([^"]*)"$/
+     */
+    public function iAmInContentRepository(string $contentRepositoryId): void
+    {
+        $this->currentContentRepository = $this->getContentRepository(ContentRepositoryId::fromString($contentRepositoryId));
+    }
+
+    /**
+     * @throws \DomainException if the requested content repository instance does not exist
+     */
+    abstract protected function getContentRepository(ContentRepositoryId $id): ContentRepository;
+
+    /**
+     * @Given /^I am user identified by "([^"]*)"$/
+     */
+    public function iAmUserIdentifiedBy(string $userId): void
+    {
+        FakeAuthProvider::setDefaultUserId(UserId::fromString($userId));
+    }
+
+    /**
+     * @When the current date and time is :timestamp
+     */
+    public function theCurrentDateAndTimeIs(string $timestamp): void
+    {
+        FakeClock::setNow(\DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $timestamp));
+    }
+
+    /**
+     * @Given /^I am in workspace "([^"]*)"$/
+     */
+    public function iAmInWorkspace(string $workspaceName): void
+    {
+        $this->currentWorkspaceName = WorkspaceName::fromString($workspaceName);
+    }
+
+    /**
+     * @Given /^I am in dimension space point (.*)$/
+     */
+    public function iAmInDimensionSpacePoint(string $dimensionSpacePoint): void
+    {
+        $this->currentDimensionSpacePoint = DimensionSpacePoint::fromJsonString($dimensionSpacePoint);
+    }
+
+    /**
+     * @Given /^I am in workspace "([^"]*)" and dimension space point (.*)$/
+     * @throws \Exception
+     */
+    public function iAmInWorkspaceAndDimensionSpacePoint(string $workspaceName, string $dimensionSpacePoint): void
+    {
+        $this->iAmInWorkspace($workspaceName);
+        $this->iAmInDimensionSpacePoint($dimensionSpacePoint);
+    }
+
+    public function getCurrentSubgraph(): ContentSubgraphInterface
+    {
+        return $this->currentContentRepository->getContentGraph($this->currentWorkspaceName)->getSubgraph(
+            $this->currentDimensionSpacePoint,
+            /**
+             * We don't restrict visibility for most cases to simplify test assertions and reasoning. Visibility constraints are not relevant for command execution and general assertions. They are only tested during Node Querying / Traversal
+             * See {@see NodeTraversalTrait::getCurrentSubgraphForQueries()}
+             */
+            VisibilityConstraints::createEmpty(),
+        );
+    }
+
+    /**
+     * @Given /^I remember NodeAggregateId of node "([^"]*)"s child "([^"]*)" as "([^"]*)"$/
+     */
+    public function iRememberNodeAggregateIdOfNodesChildAs(string $parentNodeAggregateId, string $childNodeName, string $indexName): void
+    {
+        $this->rememberedNodeAggregateIds[$indexName] = $this->getCurrentSubgraph()->findNodeByPath(
+            NodePath::fromString($childNodeName),
+            NodeAggregateId::fromString($parentNodeAggregateId),
+        )->aggregateId;
+    }
+
+    protected function getCurrentNodeAggregateId(): ?NodeAggregateId
+    {
+        return $this->currentNode?->aggregateId;
+    }
+}

@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Browser\Controller;
 
 /*
@@ -52,7 +53,7 @@ class ImageController extends AssetController
      * @return void
      * @throws \Neos\Utility\Exception\FilesException
      */
-    public function indexAction($view = null, $sortBy = null, $sortDirection = null, $filter = null, $tagMode = self::TAG_GIVEN, Tag $tag = null, $searchTerm = null, $collectionMode = self::COLLECTION_GIVEN, AssetCollection $assetCollection = null, $assetSourceIdentifier = null): void
+    public function indexAction($view = null, $sortBy = null, $sortDirection = null, $filter = null, $tagMode = self::TAG_GIVEN, ?Tag $tag = null, $searchTerm = null, $collectionMode = self::COLLECTION_GIVEN, ?AssetCollection $assetCollection = null, $assetSourceIdentifier = null): void
     {
         $this->view->assign('filterOptions', []);
         parent::indexAction($view, $sortBy, $sortDirection, 'Image', $tagMode, $tag, $searchTerm, $collectionMode, $assetCollection, $assetSourceIdentifier);
@@ -64,9 +65,8 @@ class ImageController extends AssetController
      * @param AssetInterface $asset
      * @return void
      * @throws \Neos\Flow\Mvc\Exception\StopActionException
-     * @throws \Neos\Flow\Mvc\Exception\UnsupportedRequestTypeException
      */
-    public function editAction(string $assetSourceIdentifier = null, string $assetProxyIdentifier = null, AssetInterface $asset = null): void
+    public function editAction(?string $assetSourceIdentifier = null, ?string $assetProxyIdentifier = null, ?AssetInterface $asset = null): void
     {
         if ($assetSourceIdentifier !== null && $assetProxyIdentifier !== null) {
             parent::editAction($assetSourceIdentifier, $assetProxyIdentifier);

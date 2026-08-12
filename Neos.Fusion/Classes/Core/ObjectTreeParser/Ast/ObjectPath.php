@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser\Ast;
@@ -16,21 +17,21 @@ namespace Neos\Fusion\Core\ObjectTreeParser\Ast;
 use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Core\ObjectTreeParser\AstNodeVisitorInterface;
 
+/** @internal */
 #[Flow\Proxy(false)]
-class ObjectPath extends AbstractNode
+final readonly class ObjectPath extends AbstractNode
 {
     /**
-     * @psalm-readonly
      * @var AbstractPathSegment[]
      */
-    public $segments;
+    public array $segments;
 
     public function __construct(AbstractPathSegment ...$segments)
     {
         $this->segments = $segments;
     }
 
-    public function visit(AstNodeVisitorInterface $visitor, ...$args)
+    public function visit(AstNodeVisitorInterface $visitor, mixed ...$args)
     {
         return $visitor->visitObjectPath($this, ...$args);
     }

@@ -1,0 +1,844 @@
+Feature: Publishing hide/show scenario of nodes
+
+  Node structure is as follows:
+  - rn-identifier (root node)
+  -- sir-david-nodenborough (name=text1) <== this one is modified and published
+  --- nody-mc-nodeface (name=text2)
+  -- sir-nodeward-nodington-iii (name=image) <== this one is modified
+
+  The setup is always as follows:
+  - we modify two nodes using a certain command (e.g. TagSubtree) in the USER workspace
+  - assert the change only affected the USER workspace
+  - we publish one of them
+  - we check that the user workspace still sees both nodes as hidden; and the live workspace only sees one of the changes.
+
+  We do the same for other commands. This way, we ensure that both the command works generally;
+  and the separation of nodes to publish and keep is actually implemented somehow properly.
+
+
+  Background:
+    Given using the following content dimensions:
+      | Identifier | Values      | Generalizations |
+      | language   | gsw, de, fr | gsw->de         |
+    And using the following node types:
+    """yaml
+    Neos.ContentRepository:Root: {}
+    Neos.ContentRepository:Root1:
+      superTypes:
+        Neos.ContentRepository:Root: true
+    Neos.ContentRepository:Root2:
+      superTypes:
+        Neos.ContentRepository:Root: true
+    'Neos.ContentRepository.Testing:Content':
+      properties:
+        text:
+          type: string
+        referenceProperty:
+          type: reference
+    'Neos.ContentRepository.Testing:Image':
+      properties:
+        image:
+          type: string
+    """
+    And using identifier "default", I define a content repository
+    And I am in content repository "default"
+    And the command CreateRootWorkspace is executed with payload:
+      | Key                | Value           |
+      | workspaceName      | "live"          |
+      | newContentStreamId | "cs-identifier" |
+    And I am in workspace "live" and dimension space point {"language":"de"}
+    And the command CreateRootNodeAggregateWithNode is executed with payload:
+      | Key             | Value                         |
+      | nodeAggregateId | "lady-eleonode-rootford"      |
+      | nodeTypeName    | "Neos.ContentRepository:Root" |
+    And the command CreateNodeAggregateWithNode is executed with payload:
+      | Key                       | Value                                    |
+      | workspaceName             | "live"                                   |
+      | nodeAggregateId           | "sir-david-nodenborough"                 |
+      | nodeName                  | "text1"                                  |
+      | nodeTypeName              | "Neos.ContentRepository.Testing:Content" |
+      | originDimensionSpacePoint | {"language":"de"}                        |
+      | parentNodeAggregateId     | "lady-eleonode-rootford"                 |
+      | initialPropertyValues     | {"text": "Initial t1"}                   |
+    And the command CreateNodeAggregateWithNode is executed with payload:
+      | Key                       | Value                                    |
+      | workspaceName             | "live"                                   |
+      | nodeAggregateId           | "nody-mc-nodeface"                       |
+      | nodeTypeName              | "Neos.ContentRepository.Testing:Content" |
+      | originDimensionSpacePoint | {"language":"de"}                        |
+      | parentNodeAggregateId     | "sir-david-nodenborough"                 |
+      | initialPropertyValues     | {"text": "Initial t2"}                   |
+    And the command CreateNodeAggregateWithNode is executed with payload:
+      | Key                       | Value                                  |
+      | workspaceName             | "live"                                 |
+      | nodeAggregateId           | "sir-nodeward-nodington-iii"           |
+      | nodeName                  | "image"                                |
+      | nodeTypeName              | "Neos.ContentRepository.Testing:Image" |
+      | originDimensionSpacePoint | {"language":"de"}                      |
+      | parentNodeAggregateId     | "lady-eleonode-rootford"               |
+      | initialPropertyValues     | {"image": "Initial image"}             |
+
+  Scenario: (TagSubtree) It is possible to publish hiding of a node.
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+    And I am in workspace "user-test"
+
+    # SETUP: hide two nodes in USER workspace
+    Given the command TagSubtree is executed with payload:
+      | Key                          | Value                    |
+      | nodeAggregateId              | "sir-david-nodenborough" |
+      | coveredDimensionSpacePoint   | {"language":"de"}        |
+      | nodeVariantSelectionStrategy | "allVariants"            |
+      | tag                          | "disabled"               |
+    And the command TagSubtree is executed with payload:
+      | Key                          | Value                        |
+      | nodeAggregateId              | "sir-nodeward-nodington-iii" |
+      | coveredDimensionSpacePoint   | {"language":"de"}            |
+      | nodeVariantSelectionStrategy | "allVariants"                |
+      | tag                          | "disabled"                   |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node cs-identifier;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough
+      nody-mc-nodeface
+     sir-nodeward-nodington-iii
+    """
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier;sir-david-nodenborough;{"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node user-cs-identifier;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough (disabled*)
+      nody-mc-nodeface (disabled)
+     sir-nodeward-nodington-iii (disabled*)
+    """
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                      |
+      | workspaceName                   | "user-test"                |
+      | nodesToPublish                  | ["sir-david-nodenborough"] |
+      | contentStreamIdForRemainingPart | "remaining-cs-id"          |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node cs-identifier;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough (disabled*)
+      nody-mc-nodeface (disabled)
+     sir-nodeward-nodington-iii
+    """
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    # Ensure that we are in content stream remaining-cs-id
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node remaining-cs-id;sir-david-nodenborough;{"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node remaining-cs-id;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough (disabled*)
+      nody-mc-nodeface (disabled)
+     sir-nodeward-nodington-iii (disabled*)
+    """
+
+  Scenario: (UntagSubtree) It is possible to publish showing of a node.
+    # BEFORE: ensure two nodes are hidden in live (and user WS)
+    Given the command TagSubtree is executed with payload:
+      | Key                          | Value                    |
+      | nodeAggregateId              | "sir-david-nodenborough" |
+      | coveredDimensionSpacePoint   | {"language":"de"}        |
+      | nodeVariantSelectionStrategy | "allVariants"            |
+      | tag                          | "disabled"               |
+    Given the command TagSubtree is executed with payload:
+      | Key                          | Value                        |
+      | nodeAggregateId              | "sir-nodeward-nodington-iii" |
+      | coveredDimensionSpacePoint   | {"language":"de"}            |
+      | nodeVariantSelectionStrategy | "allVariants"                |
+      | tag                          | "disabled"                   |
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: enable two nodes in USER workspace
+    Given the command UntagSubtree is executed with payload:
+      | Key                          | Value                    |
+      | workspaceName                | "user-test"              |
+      | nodeAggregateId              | "sir-david-nodenborough" |
+      | coveredDimensionSpacePoint   | {"language":"de"}        |
+      | nodeVariantSelectionStrategy | "allVariants"            |
+      | tag                          | "disabled"               |
+    Given the command UntagSubtree is executed with payload:
+      | Key                          | Value                        |
+      | workspaceName                | "user-test"                  |
+      | nodeAggregateId              | "sir-nodeward-nodington-iii" |
+      | coveredDimensionSpacePoint   | {"language":"de"}            |
+      | nodeVariantSelectionStrategy | "allVariants"                |
+      | tag                          | "disabled"                   |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node cs-identifier;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough (disabled*)
+      nody-mc-nodeface (disabled)
+     sir-nodeward-nodington-iii (disabled*)
+    """
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier;sir-david-nodenborough;{"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node user-cs-identifier;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough
+      nody-mc-nodeface
+     sir-nodeward-nodington-iii
+    """
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["sir-david-nodenborough"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node cs-identifier;sir-david-nodenborough;{"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node cs-identifier;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough
+      nody-mc-nodeface
+     sir-nodeward-nodington-iii (disabled*)
+    """
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier-modified;sir-david-nodenborough;{"language":"de"}
+    Then I expect node aggregate identifier "lady-eleonode-rootford" to lead to node user-cs-identifier-modified;lady-eleonode-rootford;{}
+    When I expect this node to have the following subtree with tags:
+    """
+    lady-eleonode-rootford
+     sir-david-nodenborough
+      nody-mc-nodeface
+     sir-nodeward-nodington-iii
+    """
+
+  Scenario: (ChangeNodeAggregateName) It is possible to publish changing the node name.
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: change two node names in USER workspace
+    Given the command ChangeNodeAggregateName is executed with payload:
+      | Key             | Value                    |
+      | workspaceName   | "user-test"              |
+      | nodeAggregateId | "sir-david-nodenborough" |
+      | newNodeName     | "text1mod"               |
+    Given the command ChangeNodeAggregateName is executed with payload:
+      | Key             | Value                        |
+      | workspaceName   | "user-test"                  |
+      | nodeAggregateId | "sir-nodeward-nodington-iii" |
+      | newNodeName     | "imagemod"                   |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be named "text1"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be named "image"
+    And I expect node aggregate identifier "lady-eleonode-rootford" to lead to node cs-identifier;lady-eleonode-rootford;{}
+    Then I expect this node to have the following child nodes:
+      | Name  | nodeAggregateId            |
+      | text1 | sir-david-nodenborough     |
+      | image | sir-nodeward-nodington-iii |
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be named "text1mod"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be named "imagemod"
+    And I expect node aggregate identifier "lady-eleonode-rootford" to lead to node user-cs-identifier;lady-eleonode-rootford;{}
+    Then I expect this node to have the following child nodes:
+      | Name     | nodeAggregateId            |
+      | text1mod | sir-david-nodenborough     |
+      | imagemod | sir-nodeward-nodington-iii |
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                          |
+      | workspaceName                   | "user-test"                    |
+      | nodesToPublish                  | ["sir-david-nodenborough"]     |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-remaining" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be named "text1mod"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be named "image"
+    And I expect node aggregate identifier "lady-eleonode-rootford" to lead to node cs-identifier;lady-eleonode-rootford;{}
+    Then I expect this node to have the following child nodes:
+      | Name     | nodeAggregateId            |
+      | text1mod | sir-david-nodenborough     |
+      | image    | sir-nodeward-nodington-iii |
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be named "text1mod"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be named "imagemod"
+    And I expect node aggregate identifier "lady-eleonode-rootford" to lead to node user-cs-identifier-remaining;lady-eleonode-rootford;{}
+    Then I expect this node to have the following child nodes:
+      | Name     | nodeAggregateId            |
+      | text1mod | sir-david-nodenborough     |
+      | imagemod | sir-nodeward-nodington-iii |
+
+  Scenario: (ChangeNodeAggregateType) It is possible to publish changing the node type name.
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: change two node types in USER workspace
+    Given the command ChangeNodeAggregateType is executed with payload:
+      | Key             | Value                                  |
+      | workspaceName   | "user-test"                            |
+      | nodeAggregateId | "sir-david-nodenborough"               |
+      | newNodeTypeName | "Neos.ContentRepository.Testing:Image" |
+      | strategy        | "delete"                               |
+
+    Given the command ChangeNodeAggregateType is executed with payload:
+      | Key             | Value                                    |
+      | workspaceName   | "user-test"                              |
+      | nodeAggregateId | "sir-nodeward-nodington-iii"             |
+      | newNodeTypeName | "Neos.ContentRepository.Testing:Content" |
+      | strategy        | "delete"                                 |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Content"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Image"
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Image"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Content"
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                          |
+      | workspaceName                   | "user-test"                    |
+      | nodesToPublish                  | ["sir-david-nodenborough"]     |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-remaining" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Image"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Image"
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Image"
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to be of type "Neos.ContentRepository.Testing:Content"
+
+  Scenario: (RemoveNodeAggregate) It is possible to publish a node removal
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: remove two nodes in USER workspace
+    When the command RemoveNodeAggregate is executed with payload:
+      | Key                          | Value                    |
+      | workspaceName                | "user-test"              |
+      | nodeAggregateId              | "sir-david-nodenborough" |
+      | coveredDimensionSpacePoint   | {"language":"de"}        |
+      | nodeVariantSelectionStrategy | "allVariants"            |
+
+    When the command RemoveNodeAggregate is executed with payload:
+      | Key                          | Value                        |
+      | workspaceName                | "user-test"                  |
+      | nodeAggregateId              | "sir-nodeward-nodington-iii" |
+      | coveredDimensionSpacePoint   | {"language":"de"}            |
+      | nodeVariantSelectionStrategy | "allVariants"                |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node cs-identifier;sir-david-nodenborough;{"language":"de"}
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node cs-identifier;nody-mc-nodeface;{"language":"de"}
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to node cs-identifier;sir-nodeward-nodington-iii;{"language":"de"}
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to no node
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to no node
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to no node
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["sir-david-nodenborough"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to no node
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to no node
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to node cs-identifier;sir-nodeward-nodington-iii;{"language":"de"}
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to no node
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to no node
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to no node
+
+  Scenario: (SetNodeProperties) It is possible to publish setting node references
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: set two node properties in USER workspace
+    When the command SetNodeProperties is executed with payload:
+      | Key                       | Value                    |
+      | workspaceName             | "user-test"              |
+      | nodeAggregateId           | "sir-david-nodenborough" |
+      | originDimensionSpacePoint | {"language":"de"}        |
+      | propertyValues            | {"text": "Modified t1"}  |
+    And the command SetNodeProperties is executed with payload:
+      | Key                       | Value                   |
+      | workspaceName             | "user-test"             |
+      | nodeAggregateId           | "nody-mc-nodeface"      |
+      | originDimensionSpacePoint | {"language":"de"}       |
+      | propertyValues            | {"text": "Modified t2"} |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node cs-identifier;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value        |
+      | text | "Initial t1" |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node cs-identifier;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value        |
+      | text | "Initial t2" |
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value         |
+      | text | "Modified t1" |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node user-cs-identifier;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value         |
+      | text | "Modified t2" |
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["sir-david-nodenborough"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node cs-identifier;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value         |
+      | text | "Modified t1" |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node cs-identifier;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value        |
+      | text | "Initial t2" |
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier-modified;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value         |
+      | text | "Modified t1" |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node user-cs-identifier-modified;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have the following properties:
+      | Key  | Value         |
+      | text | "Modified t2" |
+
+  Scenario: (SetNodeReferences) It is possible to publish setting node references
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: set two node references in USER workspace
+    When the command SetNodeReferences is executed with payload:
+      | Key                             | Value                                                                                             |
+      | workspaceName                   | "user-test"                                                                                       |
+      | sourceNodeAggregateId           | "sir-david-nodenborough"                                                                          |
+      | sourceOriginDimensionSpacePoint | {"language":"de"}                                                                                 |
+      | references                      | [{"referenceName": "referenceProperty", "references": [{"target":"sir-nodeward-nodington-iii"}]}] |
+    And the command SetNodeReferences is executed with payload:
+      | Key                             | Value                                                                                             |
+      | workspaceName                   | "user-test"                                                                                       |
+      | sourceNodeAggregateId           | "nody-mc-nodeface"                                                                                |
+      | sourceOriginDimensionSpacePoint | {"language":"de"}                                                                                 |
+      | references                      | [{"referenceName": "referenceProperty", "references": [{"target":"sir-nodeward-nodington-iii"}]}] |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node cs-identifier;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have no references
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node cs-identifier;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have no references
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to node cs-identifier;sir-nodeward-nodington-iii;{"language":"de"}
+    And I expect this node to have no references
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following references:
+      | Name              | Node                                                            | Properties |
+      | referenceProperty | user-cs-identifier;sir-nodeward-nodington-iii;{"language":"de"} | null       |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node user-cs-identifier;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have the following references:
+      | Name              | Node                                                            | Properties |
+      | referenceProperty | user-cs-identifier;sir-nodeward-nodington-iii;{"language":"de"} | null       |
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to node user-cs-identifier;sir-nodeward-nodington-iii;{"language":"de"}
+    And I expect this node to have no references
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["sir-david-nodenborough"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node cs-identifier;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following references:
+      | Name              | Node                                                       | Properties |
+      | referenceProperty | cs-identifier;sir-nodeward-nodington-iii;{"language":"de"} | null       |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node cs-identifier;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have no references
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to node cs-identifier;sir-nodeward-nodington-iii;{"language":"de"}
+    And I expect this node to have no references
+    And I expect this node to be referenced by:
+      | Name              | Node                                                   | Properties |
+      | referenceProperty | cs-identifier;sir-david-nodenborough;{"language":"de"} | null       |
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "sir-david-nodenborough" to lead to node user-cs-identifier-modified;sir-david-nodenborough;{"language":"de"}
+    And I expect this node to have the following references:
+      | Name              | Node                                                                     | Properties |
+      | referenceProperty | user-cs-identifier-modified;sir-nodeward-nodington-iii;{"language":"de"} | null       |
+    Then I expect node aggregate identifier "nody-mc-nodeface" to lead to node user-cs-identifier-modified;nody-mc-nodeface;{"language":"de"}
+    And I expect this node to have the following references:
+      | Name              | Node                                                                     | Properties |
+      | referenceProperty | user-cs-identifier-modified;sir-nodeward-nodington-iii;{"language":"de"} | null       |
+    Then I expect node aggregate identifier "sir-nodeward-nodington-iii" to lead to node user-cs-identifier-modified;sir-nodeward-nodington-iii;{"language":"de"}
+    And I expect this node to have no references
+    And I expect this node to be referenced by:
+      | Name              | Node                                                                 | Properties |
+      | referenceProperty | user-cs-identifier-modified;nody-mc-nodeface;{"language":"de"}       | null       |
+      | referenceProperty | user-cs-identifier-modified;sir-david-nodenborough;{"language":"de"} | null       |
+
+  Scenario: (CreateRootNodeAggregateWithNode) It is possible to publish new root nodes
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: set two new root nodes in USER workspace
+    When the command CreateRootNodeAggregateWithNode is executed with payload:
+      | Key             | Value                          |
+      | workspaceName   | "user-test"                    |
+      | nodeAggregateId | "new1-root-agg"                |
+      | nodeTypeName    | "Neos.ContentRepository:Root1" |
+    When the command CreateRootNodeAggregateWithNode is executed with payload:
+      | Key                       | Value                          |
+      | workspaceName             | "user-test"                    |
+      | nodeAggregateId           | "new2-root-agg"                |
+      | nodeTypeName              | "Neos.ContentRepository:Root2" |
+      | originDimensionSpacePoint | {"language":"de"}              |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-root-agg" to lead to no node
+    Then I expect node aggregate identifier "new2-root-agg" to lead to no node
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-root-agg" to lead to node user-cs-identifier;new1-root-agg;{}
+    Then I expect node aggregate identifier "new2-root-agg" to lead to node user-cs-identifier;new2-root-agg;{}
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["new1-root-agg"]             |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-root-agg" to lead to node cs-identifier;new1-root-agg;{}
+    Then I expect node aggregate identifier "new2-root-agg" to lead to no node
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-root-agg" to lead to node user-cs-identifier-modified;new1-root-agg;{}
+    Then I expect node aggregate identifier "new2-root-agg" to lead to node user-cs-identifier-modified;new2-root-agg;{}
+
+  Scenario: (UpdateRootNodeAggregateDimensions) It is possible to publish updating root nodes
+    Given the command CreateRootNodeAggregateWithNode is executed with payload:
+      | Key             | Value                          |
+      | workspaceName   | "live"                         |
+      | nodeAggregateId | "sire-frode-rootford"          |
+      | nodeTypeName    | "Neos.ContentRepository:Root1" |
+    And the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+    And I change the content dimensions in content repository "default" to:
+      | Identifier | Values          | Generalizations |
+      | language   | gsw, de, fr, dk | gsw->de         |
+
+    # SETUP: update two root nodes in USER workspace
+    And the command UpdateRootNodeAggregateDimensions is executed with payload:
+      | Key             | Value                    |
+      | workspaceName   | "user-test"              |
+      | nodeAggregateId | "lady-eleonode-rootford" |
+    # TODO its not possible to publish updating of two root nodes (see https://github.com/neos/neos-development-collection/pull/5814)
+    # And the command UpdateRootNodeAggregateDimensions is executed with payload:
+    #   | Key             | Value                 |
+    #   | workspaceName   | "user-test"           |
+    #   | nodeAggregateId | "sire-frode-rootford" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "lady-eleonode-rootford" to exist
+    And I expect this node aggregate to occupy dimension space points [{}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+    Then I expect the node aggregate "sire-frode-rootford" to exist
+    And I expect this node aggregate to occupy dimension space points [{}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "lady-eleonode-rootford" to exist
+    And I expect this node aggregate to occupy dimension space points [{}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}, {"language":"dk"}]
+    # Then I expect the node aggregate "sire-frode-rootford" to exist
+    # And I expect this node aggregate to occupy dimension space points [{}]
+    # And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}, {"language":"dk"}]
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["lady-eleonode-rootford"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "lady-eleonode-rootford" to exist
+    And I expect this node aggregate to occupy dimension space points [{}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}, {"language":"dk"}]
+    Then I expect the node aggregate "sire-frode-rootford" to exist
+    And I expect this node aggregate to occupy dimension space points [{}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "lady-eleonode-rootford" to exist
+    And I expect this node aggregate to occupy dimension space points [{}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}, {"language":"dk"}]
+    # Then I expect the node aggregate "sire-frode-rootford" to exist
+    # And I expect this node aggregate to occupy dimension space points [{}]
+    # And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}, {"language":"dk"}]
+
+  Scenario: (CreateNodeAggregateWithNode) It is possible to publish new nodes
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: set two new nodes in USER workspace
+    When the command CreateNodeAggregateWithNode is executed with payload:
+      | Key                       | Value                                    |
+      | workspaceName             | "user-test"                              |
+      | nodeAggregateId           | "new1-agg"                               |
+      | nodeTypeName              | "Neos.ContentRepository.Testing:Content" |
+      | originDimensionSpacePoint | {"language":"de"}                        |
+      | parentNodeAggregateId     | "lady-eleonode-rootford"                 |
+      | nodeName                  | "foo"                                    |
+    When the command CreateNodeAggregateWithNode is executed with payload:
+      | Key                       | Value                                    |
+      | workspaceName             | "user-test"                              |
+      | nodeAggregateId           | "new2-agg"                               |
+      | nodeTypeName              | "Neos.ContentRepository.Testing:Content" |
+      | originDimensionSpacePoint | {"language":"de"}                        |
+      | parentNodeAggregateId     | "lady-eleonode-rootford"                 |
+      | nodeName                  | "foo2"                                   |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-agg" to lead to no node
+    Then I expect node aggregate identifier "new2-agg" to lead to no node
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-agg" to lead to node user-cs-identifier;new1-agg;{"language":"de"}
+    Then I expect node aggregate identifier "new2-agg" to lead to node user-cs-identifier;new2-agg;{"language":"de"}
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["new1-agg"]                  |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-agg" to lead to node cs-identifier;new1-agg;{"language":"de"}
+    Then I expect node aggregate identifier "new2-agg" to lead to no node
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect node aggregate identifier "new1-agg" to lead to node user-cs-identifier-modified;new1-agg;{"language":"de"}
+    Then I expect node aggregate identifier "new2-agg" to lead to node user-cs-identifier-modified;new2-agg;{"language":"de"}
+
+  Scenario: (MoveNodeAggregate) It is possible to publish moving nodes
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: move two new nodes in USER workspace
+    When the command MoveNodeAggregate is executed with payload:
+      | Key                          | Value                        |
+      | workspaceName                | "user-test"                  |
+      | dimensionSpacePoint          | {"language":"de"}            |
+      | relationDistributionStrategy | "gatherAll"                  |
+      | nodeAggregateId              | "sir-david-nodenborough"     |
+      | newParentNodeAggregateId     | "sir-nodeward-nodington-iii" |
+    When the command MoveNodeAggregate is executed with payload:
+      | Key                          | Value                    |
+      | workspaceName                | "user-test"              |
+      | dimensionSpacePoint          | {"language":"de"}        |
+      | relationDistributionStrategy | "gatherAll"              |
+      | nodeAggregateId              | "nody-mc-nodeface"       |
+      | newParentNodeAggregateId     | "lady-eleonode-rootford" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have the child node aggregates ["nody-mc-nodeface"]
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to have the parent node aggregates ["sir-david-nodenborough"]
+    And I expect this node aggregate to have no child node aggregates
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have no child node aggregates
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to have the parent node aggregates ["sir-nodeward-nodington-iii"]
+    And I expect this node aggregate to have no child node aggregates
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have no child node aggregates
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have the child node aggregates ["sir-david-nodenborough"]
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["sir-david-nodenborough"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to have the parent node aggregates ["sir-nodeward-nodington-iii"]
+    And I expect this node aggregate to have the child node aggregates ["nody-mc-nodeface"]
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to have the parent node aggregates ["sir-david-nodenborough"]
+    And I expect this node aggregate to have no child node aggregates
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have the child node aggregates ["sir-david-nodenborough"]
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to have the parent node aggregates ["sir-nodeward-nodington-iii"]
+    And I expect this node aggregate to have no child node aggregates
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have no child node aggregates
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to have the parent node aggregates ["lady-eleonode-rootford"]
+    And I expect this node aggregate to have the child node aggregates ["sir-david-nodenborough"]
+
+  Scenario: (CreateNodeVariant) It is possible to varying nodes
+    Given the command CreateWorkspace is executed with payload:
+      | Key                | Value                |
+      | workspaceName      | "user-test"          |
+      | baseWorkspaceName  | "live"               |
+      | newContentStreamId | "user-cs-identifier" |
+
+    # SETUP: vary two new nodes in USER workspace
+    When the command CreateNodeVariant is executed with payload:
+      | Key             | Value                    |
+      | workspaceName   | "user-test"              |
+      | nodeAggregateId | "sir-david-nodenborough" |
+      | sourceOrigin    | {"language":"de"}        |
+      | targetOrigin    | {"language":"fr"}        |
+    When the command CreateNodeVariant is executed with payload:
+      | Key             | Value              |
+      | workspaceName   | "user-test"        |
+      | nodeAggregateId | "nody-mc-nodeface" |
+      | sourceOrigin    | {"language":"de"}  |
+      | targetOrigin    | {"language":"fr"}  |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}, {"language":"fr"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}, {"language":"fr"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]
+
+    When the command PublishIndividualNodesFromWorkspace is executed with payload:
+      | Key                             | Value                         |
+      | workspaceName                   | "user-test"                   |
+      | nodesToPublish                  | ["sir-david-nodenborough"]    |
+      | contentStreamIdForRemainingPart | "user-cs-identifier-modified" |
+
+    When I am in workspace "live" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}, {"language":"fr"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]
+
+    When I am in workspace "user-test" and dimension space point {"language":"de"}
+    Then I expect the node aggregate "sir-david-nodenborough" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}, {"language":"fr"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+    Then I expect the node aggregate "nody-mc-nodeface" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}, {"language":"fr"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}, {"language":"fr"}]
+    Then I expect the node aggregate "sir-nodeward-nodington-iii" to exist
+    And I expect this node aggregate to occupy dimension space points [{"language":"de"}]
+    And I expect this node aggregate to cover dimension space points [{"language":"de"}, {"language":"gsw"}]

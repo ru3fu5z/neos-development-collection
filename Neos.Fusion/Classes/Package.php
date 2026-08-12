@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion;
 
 /*
@@ -42,11 +43,7 @@ class Package extends BasePackage
                     $fusionFileMonitor = FileMonitor::createFileMonitorAtBoot('Fusion_Files', $bootstrap);
                     /** @var PackageManager $packageManager */
                     $packageManager = $bootstrap->getEarlyInstance(PackageManager::class);
-                    foreach ($packageManager->getFlowPackages() as $packageKey => $package) {
-                        if ($packageManager->isPackageFrozen($packageKey)) {
-                            continue;
-                        }
-
+                    foreach ($packageManager->getFlowPackages() as $package) {
                         $fusionPaths = [
                             $package->getResourcesPath() . 'Private/Fusion',
                             $package->getPackagePath() . 'NodeTypes'

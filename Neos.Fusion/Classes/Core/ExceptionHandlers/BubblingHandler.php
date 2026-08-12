@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Neos\Fusion\Core\ExceptionHandlers;
 
 /*
@@ -23,7 +26,7 @@ class BubblingHandler extends AbstractRenderingExceptionHandler
     /**
      * Handle an Exception thrown while rendering Fusion
      *
-     * @param array $fusionPath
+     * @param string $fusionPath
      * @param \Exception $exception
      * @return string
      * @throws StopActionException
@@ -44,11 +47,12 @@ class BubblingHandler extends AbstractRenderingExceptionHandler
      *
      * @param string $fusionPath path causing the exception
      * @param \Exception $exception exception to handle
-     * @param integer $referenceCode
-     * @return void
+     * @param string|null $referenceCode
+     * @return string
      */
     protected function handle($fusionPath, \Exception $exception, $referenceCode)
     {
         // nothing to be done here, as this method is normally called in "handleRenderingException()", which was overridden above.
+        throw new \BadMethodCallException('Never called.');
     }
 }

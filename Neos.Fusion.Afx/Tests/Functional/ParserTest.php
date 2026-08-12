@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Afx\Tests\Functional;
 
 use Neos\Fusion\Afx\Parser\AfxParserException;
@@ -32,6 +33,26 @@ class ParserTest extends TestCase
                 [
                     'type' => 'text',
                     'payload' => '    '
+                ]
+            ],
+            $parser->parse()
+        );
+    }
+
+    /**
+     * @test
+     */
+    public function shouldParseASingleExpression(): void
+    {
+        $parser = new Parser('{String.uppercase("test")}');
+
+        $this->assertEquals(
+            [
+                [
+                    'type' => 'expression',
+                    'payload' => 'String.uppercase("test")',
+                    'from' => 1,
+                    'to' => 24
                 ]
             ],
             $parser->parse()
@@ -79,6 +100,36 @@ class ParserTest extends TestCase
                             0 => [
                                 'type' => 'text',
                                 'payload' => 'test'
+                            ]
+                        ],
+                        'selfClosing' => false
+                    ]
+                ]
+            ],
+            $parser->parse()
+        );
+    }
+
+    /**
+     * @test
+     */
+    public function shouldParseSingleTagWithContentExpression(): void
+    {
+        $parser = new Parser('<div>{String.uppercase("test")}</div>');
+
+        $this->assertEquals(
+            [
+                [
+                    'type' => 'node',
+                    'payload' => [
+                        'identifier' => 'div',
+                        'attributes' => [],
+                        'children' => [
+                            0 => [
+                                'type' => 'expression',
+                                'payload' => 'String.uppercase("test")',
+                                'from' => 6,
+                                'to' => 29
                             ]
                         ],
                         'selfClosing' => false
@@ -206,6 +257,40 @@ class ParserTest extends TestCase
                                     'type' => 'string',
                                     'payload' => 'value',
                                     'identifier' => 'prop'
+                                ]
+                            ]
+                        ],
+                        'children' => [],
+                        'selfClosing' => true
+                    ]
+                ]
+            ],
+            $parser->parse()
+        );
+    }
+
+    /**
+     * @test
+     */
+    public function shouldParseSingleSelfClosingTagWithSingleAttributeExpression(): void
+    {
+        $parser = new Parser('<div prop={"value" + "a"}/>');
+
+        $this->assertEquals(
+            [
+                [
+                    'type' => 'node',
+                    'payload' => [
+                        'identifier' => 'div',
+                        'attributes' => [
+                            [
+                                'type' => 'prop',
+                                'payload' => [
+                                    'type' => 'expression',
+                                    'payload' => '"value" + "a"',
+                                    'identifier' => 'prop',
+                                    'from' => 11,
+                                    'to' => 23
                                 ]
                             ]
                         ],
@@ -429,7 +514,9 @@ class ParserTest extends TestCase
                                 'payload' => [
                                     'type' => 'expression',
                                     'payload' => 'item'
-                                ]
+                                ],
+                                'from' => 9,
+                                'to' => 12
                             ]
                         ],
                         'children' => [],
@@ -468,14 +555,18 @@ class ParserTest extends TestCase
                                 'payload' => [
                                     'type' => 'expression',
                                     'payload' => 'item',
-                                ]
+                                ],
+                                'from' => 22,
+                                'to' => 25,
                             ],
                             [
                                 'type' => 'prop',
                                 'payload' => [
                                     'type' => 'expression',
                                     'payload' => 'expression',
-                                    'identifier' => 'bar'
+                                    'identifier' => 'bar',
+                                    'from' => 33,
+                                    'to' => 42,
                                 ]
                             ]
                         ],

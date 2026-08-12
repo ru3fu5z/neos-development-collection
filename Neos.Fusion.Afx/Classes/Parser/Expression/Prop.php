@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Afx\Parser\Expression;
@@ -46,7 +47,9 @@ class Prop
                 case $lexer->isOpeningBrace():
                     $value = [
                         'type' => 'expression',
+                        'from' => $lexer->getCharacterPosition() + 1,
                         'payload' => Expression::parse($lexer),
+                        'to' => $lexer->getCharacterPosition() - 2,
                         'identifier' => $identifier
                     ];
                     break;

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\SiteKickstarter\Service;
@@ -13,10 +14,13 @@ namespace Neos\SiteKickstarter\Service;
  * source code.
  */
 
-use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Annotations as Flow;
+use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\SiteKickstarter\Generator\SitePackageGeneratorInterface;
 
+/**
+ * @internal
+ */
 class SitePackageGeneratorNameService
 {
     /**
@@ -26,13 +30,10 @@ class SitePackageGeneratorNameService
     protected $objectManager;
 
     /**
-     * @param string $generatorClass fully qualified namespace
+     * @param class-string<SitePackageGeneratorInterface> $generatorClass fully qualified namespace
      */
-    public function getNameOfSitePackageGenerator(string $generatorClass) : string
+    public function getNameOfSitePackageGenerator(string $generatorClass): string
     {
-        /**
-         * @var $generator SitePackageGeneratorInterface
-         */
         $generator = $this->objectManager->get($generatorClass);
 
         return $generator->getGeneratorName();

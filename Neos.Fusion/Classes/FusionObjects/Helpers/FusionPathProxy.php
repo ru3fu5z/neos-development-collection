@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\FusionObjects\Helpers;
 
 /*
@@ -12,9 +13,9 @@ namespace Neos\Fusion\FusionObjects\Helpers;
  */
 
 use Neos\FluidAdaptor\Core\Parser\SyntaxTree\TemplateObjectAccessInterface;
+use Neos\Fusion\Exception as FusionException;
 use Neos\Fusion\Exception\UnsupportedProxyMethodException;
 use Neos\Fusion\FusionObjects\TemplateImplementation;
-use Neos\Fusion\Exception as FusionException;
 
 /**
  * A proxy object representing a Fusion path inside a Fluid Template. It allows
@@ -76,6 +77,7 @@ class FusionPathProxy implements TemplateObjectAccessInterface, \ArrayAccess, \I
      * @param string $offset
      * @return boolean
      */
+    #[\ReturnTypeWillChange]
     public function offsetExists($offset)
     {
         return isset($this->partialFusionTree[$offset]);
@@ -88,6 +90,7 @@ class FusionPathProxy implements TemplateObjectAccessInterface, \ArrayAccess, \I
      * @param string $offset
      * @return mixed|FusionPathProxy
      */
+    #[\ReturnTypeWillChange]
     public function offsetGet($offset)
     {
         if (!isset($this->partialFusionTree[$offset])) {
@@ -109,6 +112,7 @@ class FusionPathProxy implements TemplateObjectAccessInterface, \ArrayAccess, \I
      * @param mixed $value
      * @throws UnsupportedProxyMethodException
      */
+    #[\ReturnTypeWillChange]
     public function offsetSet($offset, $value)
     {
         throw new UnsupportedProxyMethodException('Setting a property of a path proxy not supported. (tried to set: ' . $this->path . ' -- ' . $offset . ')', 1372667221);
@@ -120,6 +124,7 @@ class FusionPathProxy implements TemplateObjectAccessInterface, \ArrayAccess, \I
      * @param string $offset
      * @throws UnsupportedProxyMethodException
      */
+    #[\ReturnTypeWillChange]
     public function offsetUnset($offset)
     {
         throw new UnsupportedProxyMethodException('Unsetting a property of a path proxy not supported. (tried to unset: ' . $this->path . ' -- ' . $offset . ')', 1372667331);
@@ -152,6 +157,7 @@ class FusionPathProxy implements TemplateObjectAccessInterface, \ArrayAccess, \I
      *
      * @return \ArrayIterator
      */
+    #[\ReturnTypeWillChange]
     public function getIterator()
     {
         $evaluatedArray = [];
@@ -172,6 +178,7 @@ class FusionPathProxy implements TemplateObjectAccessInterface, \ArrayAccess, \I
     /**
      * @return integer
      */
+    #[\ReturnTypeWillChange]
     public function count()
     {
         return count($this->partialFusionTree);

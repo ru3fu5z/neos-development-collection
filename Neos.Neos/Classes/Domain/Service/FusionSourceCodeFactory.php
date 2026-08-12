@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Neos\Domain\Service;
@@ -13,23 +14,33 @@ namespace Neos\Neos\Domain\Service;
  * source code.
  */
 
-use Neos\ContentRepository\Domain\Model\NodeType;
-use Neos\ContentRepository\Domain\Service\NodeTypeManager;
+use Neos\ContentRepository\Core\NodeType\NodeType;
+use Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
+use Neos\Flow\Annotations as Flow;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\Package\PackageManager;
 use Neos\Fusion\Core\FusionSourceCode;
 use Neos\Fusion\Core\FusionSourceCodeCollection;
 use Neos\Neos\Domain\Exception as NeosDomainException;
 use Neos\Neos\Domain\Model\Site;
-use Neos\Flow\Annotations as Flow;
 
+/**
+ * @internal For interacting with Fusion from the outside a FusionView should be used.
+ */
 class FusionSourceCodeFactory
 {
+    /**
+     * @var array<string, mixed>
+     */
     #[Flow\InjectConfiguration("fusion.autoInclude")]
     protected array $autoIncludeConfiguration = [];
 
     #[Flow\Inject]
-    protected NodeTypeManager $nodeTypeManager;
+    protected FusionAutoIncludeHandler $fusionAutoIncludeHandler;
+
+    #[Flow\Inject]
+    protected ContentRepositoryRegistry $contentRepositoryRegistry;
 
     #[Flow\Inject]
     protected PackageManager $packageManager;
@@ -39,17 +50,18 @@ class FusionSourceCodeFactory
 
     public function createFromAutoIncludes(): FusionSourceCodeCollection
     {
-        $sourcecode = FusionSourceCodeCollection::empty();
+        $sourcecode = FusionSourceCodeCollection::createEmpty();
         foreach (array_keys($this->packageManager->getAvailablePackages()) as $packageKey) {
             if (isset($this->autoIncludeConfiguration[$packageKey]) && $this->autoIncludeConfiguration[$packageKey] === true) {
-                $sourcecode = $sourcecode->union(
-                    FusionSourceCodeCollection::tryFromPackageRootFusion($packageKey)
-                );
+                $sourcecode = $this->fusionAutoIncludeHandler->loadFusionFromPackage($packageKey, $sourcecode);
             }
         }
         return $sourcecode;
     }
 
+    /**
+     * @deprecated with Neos 9 - YAGNI from the start :)
+     */
     public function createFromSite(Site $site): FusionSourceCodeCollection
     {
         return FusionSourceCodeCollection::tryFromPackageRootFusion($site->getSiteResourcesPackageKey());
@@ -62,10 +74,11 @@ class FusionSourceCodeFactory
      *
      * @throws NeosDomainException
      */
-    public function createFromNodeTypeDefinitions(): FusionSourceCodeCollection
+    public function createFromNodeTypeDefinitions(ContentRepositoryId $contentRepositoryId): FusionSourceCodeCollection
     {
+        $contentRepository = $this->contentRepositoryRegistry->get($contentRepositoryId);
         $fusion = [];
-        foreach ($this->nodeTypeManager->getNodeTypes(false) as $nodeType) {
+        foreach ($contentRepository->getNodeTypeManager()->getNodeTypes(false) as $nodeType) {
             $fusion[] = $this->tryCreateFromNodeTypeDefinition($nodeType);
         }
         return new FusionSourceCodeCollection(...array_filter($fusion));

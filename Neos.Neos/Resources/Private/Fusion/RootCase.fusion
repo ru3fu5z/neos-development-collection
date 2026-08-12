@@ -5,21 +5,26 @@
 #
 root = Neos.Fusion:Case
 root {
-  shortcut {
-    prototype(Neos.Neos:Page) {
-      body = Neos.Neos:Shortcut
+  documentNotVisibleInPreviewMode {
+    @position = 'before shortcut'
+    condition = ${renderingMode.isPreview && Neos.Node.isDisabled(documentNode)}
+    renderer = Neos.Neos:Document.BackendInformation {
+      content = Neos.Neos:NotVisible
     }
+  }
 
+  shortcut {
     @position = 'start'
     condition = ${q(node).is('[instanceof Neos.Neos:Shortcut]')}
-    type = 'Neos.Neos:Page'
+    renderer = Neos.Neos:Document.BackendInformation {
+      content = Neos.Neos:Shortcut
+    }
   }
 
   editPreviewMode {
     @position = 'end 9996'
-    possibleEditPreviewModePath = ${documentNode.context.currentRenderingMode.fusionPath}
-    condition = ${documentNode.context.inBackend && this.possibleEditPreviewModePath != null && this.possibleEditPreviewModePath != ''}
-    renderPath = ${'/' + this.possibleEditPreviewModePath}
+    condition = ${(renderingMode.isEdit || renderingMode.isPreview) && renderingMode.fusionPath}
+    renderPath = ${'/' + renderingMode.fusionPath}
   }
 
   format {
@@ -31,9 +36,9 @@ root {
   documentType {
     @position = 'end 9998'
     condition = Neos.Fusion:CanRender {
-      type = ${documentNode.nodeType.name}
+      type = ${documentNode.nodeTypeName}
     }
-    type = ${documentNode.nodeType.name}
+    type = ${documentNode.nodeTypeName}
   }
 
   default {
@@ -46,7 +51,7 @@ root {
 
   rawContent {
     @position = 'end 10000'
-    condition = ${documentNode.context.inBackend && documentNode.context.currentRenderingMode.edit}
+    condition = ${renderingMode.isEdit}
     renderPath = '/rawContent'
   }
 
@@ -54,14 +59,14 @@ root {
   error {
     @position = 'end 10001'
     condition = true
-    type = ${documentNode.nodeType.name}
+    type = ${documentNode.nodeTypeName}
   }
 
   @cache {
     mode = 'cached'
 
     entryIdentifier {
-      node = ${node}
+      node = ${Neos.Caching.entryIdentifierForNode(node)}
     }
     entryTags {
       # Whenever the node changes the matched condition could change

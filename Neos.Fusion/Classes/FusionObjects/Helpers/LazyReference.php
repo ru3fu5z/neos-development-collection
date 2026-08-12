@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace Neos\Fusion\FusionObjects\Helpers;
 
 /*
@@ -42,8 +44,11 @@ final class LazyReference
         }
 
         $this->isLocked = true;
-        $this->value = ($this->calculateValueCallback)();
-        $this->hasBeenDereferenced = true;
+        try {
+            $this->value = ($this->calculateValueCallback)();
+        } finally {
+            $this->hasBeenDereferenced = true;
+        }
 
         return $this->value;
     }

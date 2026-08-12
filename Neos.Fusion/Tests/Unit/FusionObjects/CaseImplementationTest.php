@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Tests\Unit\FusionObjects;
 
 /*
@@ -11,9 +12,9 @@ namespace Neos\Fusion\Tests\Unit\FusionObjects;
  * source code.
  */
 
-use Neos\Utility\ObjectAccess;
 use Neos\Fusion\Core\Runtime;
 use Neos\Fusion\FusionObjects\CaseImplementation;
+use Neos\Utility\ObjectAccess;
 
 /**
  * Testcase for the Case object
@@ -40,7 +41,7 @@ class CaseImplementationTest extends \Neos\Flow\Tests\UnitTestCase
             return ObjectAccess::getProperty($that, $relativePath, true);
         }));
 
-        $fusionObjectName = 'Neos.Neos:PrimaryContent';
+        $fusionObjectName = 'Neos.Fusion:Case';
         $renderer = new CaseImplementation($mockRuntime, $path, $fusionObjectName);
         $renderer->setIgnoreProperties($ignoredProperties);
 

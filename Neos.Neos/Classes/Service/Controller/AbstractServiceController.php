@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Service\Controller;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,15 +10,22 @@ namespace Neos\Neos\Service\Controller;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Service\Controller;
+
+use GuzzleHttp\Psr7\Response;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Exception as FlowException;
 use Neos\Flow\Log\ThrowableStorageInterface;
 use Neos\Flow\Log\Utility\LogEnvironment;
 use Neos\Flow\Mvc\ActionRequest;
-use Neos\Flow\Mvc\ActionResponse;
 use Neos\Flow\Mvc\Controller\ActionController;
+use Neos\Flow\Mvc\Exception\ForwardException;
 use Neos\Flow\Mvc\Exception\StopActionException;
 use Neos\Neos\Controller\BackendUserTranslationTrait;
+use Neos\Neos\Domain\Service\UserService;
+use Psr\Http\Message\ResponseInterface;
 
 /**
  * Abstract Service Controller
@@ -29,7 +35,7 @@ abstract class AbstractServiceController extends ActionController
     use BackendUserTranslationTrait;
 
     /**
-     * @var array
+     * @var array<int,string>
      */
     protected $supportedMediaTypes = ['application/json'];
 
@@ -41,19 +47,23 @@ abstract class AbstractServiceController extends ActionController
      */
     protected $throwableStorage2;
 
+    #[Flow\Inject]
+    protected UserService $domainUserService;
+
     /**
      * A preliminary error action for handling validation errors
      *
-     * @return void
      * @throws StopActionException
      */
-    public function errorAction()
+    protected function errorAction(): never
     {
         if ($this->arguments->getValidationResults()->hasErrors()) {
             $errors = [];
-            foreach ($this->arguments->getValidationResults()->getFlattenedErrors() as $propertyName => $propertyErrors) {
+            foreach (
+                $this->arguments->getValidationResults()->getFlattenedErrors() as $propertyName => $propertyErrors
+            ) {
+                /** @var array<\Neos\Error\Messages\Error> $propertyErrors */
                 foreach ($propertyErrors as $propertyError) {
-                    /** @var \Neos\Error\Messages\Error $propertyError */
                     $error = [
                         'severity' => $propertyError->getSeverity(),
                         'message' => $propertyError->render()
@@ -67,7 +77,7 @@ abstract class AbstractServiceController extends ActionController
                     $errors[$propertyName][] = $error;
                 }
             }
-            $this->throwStatus(409, null, json_encode($errors));
+            $this->throwStatus(409, null, json_encode($errors, JSON_THROW_ON_ERROR));
         }
         $this->throwStatus(400);
     }
@@ -75,49 +85,51 @@ abstract class AbstractServiceController extends ActionController
     /**
      * Catch exceptions while processing an exception and respond to JSON format
      * TODO: This is an explicit exception handling that will be replaced by format-enabled exception handlers.
-     *
-     * @param ActionRequest $request The request object
-     * @param ActionResponse $response The response, modified by this handler
-     * @return void
-     * @throws StopActionException
-     * @throws \Exception
      */
-    public function processRequest(ActionRequest $request, ActionResponse $response)
+    public function processRequest(ActionRequest $request): ResponseInterface
     {
         try {
-            parent::processRequest($request, $response);
-        } catch (StopActionException $exception) {
+            $response = parent::processRequest($request);
+        } catch (StopActionException | ForwardException $exception) {
             throw $exception;
         } catch (\Exception $exception) {
-            if ($this->request->getFormat() !== 'json' || !$response instanceof ActionResponse) {
+            if ($this->request->getFormat() !== 'json') {
                 throw $exception;
             }
             $exceptionData = $this->convertException($exception);
-            $response->setContentType('application/json');
-            if ($exception instanceof FlowException) {
-                $response->setStatusCode($exception->getStatusCode());
-            } else {
-                $response->setStatusCode(500);
-            }
-            $response->setContent(json_encode(['error' => $exceptionData]));
-            $this->logger->error($this->throwableStorage2->logThrowable($exception), LogEnvironment::fromMethodName(__METHOD__));
+            $body = json_encode(['error' => $exceptionData], JSON_THROW_ON_ERROR);
+            $response = new Response(
+                status: $exception instanceof FlowException
+                    ? $exception->getStatusCode()
+                    : 500,
+                headers: [
+                    'Content-Type' => 'application/json'
+                ],
+                body: $body
+            );
+            $this->logger->error(
+                $this->throwableStorage2->logThrowable($exception),
+                LogEnvironment::fromMethodName(__METHOD__)
+            );
         }
+
+        return $response;
     }
 
     /**
-     * @param \Exception $exception
-     * @return array
+     * @return array<string,mixed>
      */
-    protected function convertException(\Exception $exception)
+    protected function convertException(\Throwable $exception): array
     {
+        $exceptionData = [];
         if ($this->objectManager->getContext()->isProduction()) {
             if ($exception instanceof FlowException) {
-                $exceptionData['message'] = 'When contacting the maintainer of this application please mention the following reference code:<br /><br />' . $exception->getReferenceCode();
+                $exceptionData['message'] = 'When contacting the maintainer of this application please mention'
+                    . ' the following reference code:<br /><br />' . $exception->getReferenceCode();
             }
         } else {
             $exceptionData = [
-                'code' => $exception->getCode(),
-                'message' => $exception->getMessage(),
+                'code' => $exception->getCode()
             ];
             $splitMessagePattern = '/
                 (?<=                # Begin positive lookbehind.
@@ -128,7 +140,7 @@ abstract class AbstractServiceController extends ActionController
                   i\.E\.\s          # Skip "i.E."
                 )                   # End negative lookbehind.
                 /ix';
-            $sentences = preg_split($splitMessagePattern, $exception->getMessage(), 2, PREG_SPLIT_NO_EMPTY);
+            $sentences = preg_split($splitMessagePattern, $exception->getMessage(), 2, PREG_SPLIT_NO_EMPTY) ?: [];
             if (!isset($sentences[1])) {
                 $exceptionData['message'] = $exception->getMessage();
             } else {

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\ValueObject\Configuration;
@@ -43,15 +44,15 @@ final class Adjustment
     /**
      * @param string $identifier
      * @param array $configuration
-     * @return Adjustment
+     * @return self
      */
-    public static function fromConfiguration(string $identifier, array $configuration): Adjustment
+    public static function fromConfiguration(string $identifier, array $configuration): self
     {
         if (!isset($configuration['type'])) {
             throw new \InvalidArgumentException(sprintf('Missing type in configuration for adjustment "%s".', $identifier), 1549276551);
         }
 
-        $adjustment = new static(
+        $adjustment = new self(
             $identifier,
             $configuration['type']
         );

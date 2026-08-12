@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser\Ast;
@@ -15,7 +16,8 @@ namespace Neos\Fusion\Core\ObjectTreeParser\Ast;
 
 use Neos\Flow\Annotations as Flow;
 
+/** @internal */
 #[Flow\Proxy(false)]
-abstract class AbstractPathValue extends AbstractNode
+abstract readonly class AbstractPathValue extends AbstractNode
 {
 }

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\Repository;
@@ -13,18 +14,18 @@ namespace Neos\Media\Domain\Repository;
  * source code.
  */
 
-use Doctrine\ORM\Internal\Hydration\IterableResult;
 use Doctrine\ORM\NonUniqueResultException;
 use Doctrine\ORM\Query\ResultSetMapping;
 use Neos\Flow\Annotations as Flow;
-use Neos\Flow\Persistence\Doctrine\Query;
 use Neos\Flow\Persistence\Doctrine\Mapping\Driver\FlowAnnotationDriver;
+use Neos\Flow\Persistence\Doctrine\Query;
 use Neos\Flow\Persistence\Exception\IllegalObjectTypeException;
 use Neos\Flow\Persistence\Exception\InvalidQueryException;
 use Neos\Flow\Persistence\QueryInterface;
 use Neos\Flow\Persistence\QueryResultInterface;
 use Neos\Flow\Persistence\Repository;
 use Neos\Flow\Reflection\ReflectionService;
+use Neos\Flow\ResourceManagement\PersistentResource;
 use Neos\Media\Domain\Model\Asset;
 use Neos\Media\Domain\Model\AssetCollection;
 use Neos\Media\Domain\Model\AssetInterface;
@@ -36,6 +37,7 @@ use Neos\Media\Exception\AssetServiceException;
 /**
  * A repository for Assets
  *
+ * @method iterable<int, AssetInterface> findByResource(PersistentResource $resource)
  * @Flow\Scope("singleton")
  */
 class AssetRepository extends Repository
@@ -74,20 +76,20 @@ class AssetRepository extends Repository
      * @return QueryResultInterface
      * @throws InvalidQueryException
      */
-    public function findBySearchTermOrTags($searchTerm, array $tags = [], AssetCollection $assetCollection = null): QueryResultInterface
+    public function findBySearchTermOrTags($searchTerm, array $tags = [], ?AssetCollection $assetCollection = null): QueryResultInterface
     {
         $query = $this->createQuery();
 
         $constraints = [
-            $query->like('title', '%' . $searchTerm . '%'),
-            $query->like('resource.filename', '%' . $searchTerm . '%'),
-            $query->like('caption', '%' . $searchTerm . '%')
+            $query->like('title', '%' . $searchTerm . '%', false),
+            $query->like('resource.filename', '%' . $searchTerm . '%', false),
+            $query->like('caption', '%' . $searchTerm . '%', false)
         ];
         foreach ($tags as $tag) {
             $constraints[] = $query->contains('tags', $tag);
         }
         $query->matching($query->logicalOr($constraints));
-        $this->addAssetVariantFilterClause($query);
+        $this->addAssetVariantToQueryConstraints($query);
         $this->addAssetCollectionToQueryConstraints($query, $assetCollection);
         return $query->execute();
     }
@@ -100,11 +102,11 @@ class AssetRepository extends Repository
      * @return QueryResultInterface
      * @throws InvalidQueryException
      */
-    public function findByTag(Tag $tag, AssetCollection $assetCollection = null): QueryResultInterface
+    public function findByTag(Tag $tag, ?AssetCollection $assetCollection = null): QueryResultInterface
     {
         $query = $this->createQuery();
         $query->matching($query->contains('tags', $tag));
-        $this->addAssetVariantFilterClause($query);
+        $this->addAssetVariantToQueryConstraints($query);
         $this->addAssetCollectionToQueryConstraints($query, $assetCollection);
         return $query->execute();
     }
@@ -116,7 +118,7 @@ class AssetRepository extends Repository
      * @param AssetCollection $assetCollection
      * @return integer
      */
-    public function countByTag(Tag $tag, AssetCollection $assetCollection = null): int
+    public function countByTag(Tag $tag, ?AssetCollection $assetCollection = null): int
     {
         $rsm = new ResultSetMapping();
         $rsm->addScalarResult('c', 'c');
@@ -144,10 +146,10 @@ class AssetRepository extends Repository
      * @return QueryResultInterface
      * @throws InvalidQueryException
      */
-    public function findAll(AssetCollection $assetCollection = null): QueryResultInterface
+    public function findAll(?AssetCollection $assetCollection = null): QueryResultInterface
     {
         $query = $this->createQuery();
-        $this->addAssetVariantFilterClause($query);
+        $this->addAssetVariantToQueryConstraints($query);
         $this->addAssetCollectionToQueryConstraints($query, $assetCollection);
         return $query->execute();
     }
@@ -184,11 +186,11 @@ class AssetRepository extends Repository
      * @return QueryResultInterface
      * @throws InvalidQueryException
      */
-    public function findUntagged(AssetCollection $assetCollection = null): QueryResultInterface
+    public function findUntagged(?AssetCollection $assetCollection = null): QueryResultInterface
     {
         $query = $this->createQuery();
         $query->matching($query->isEmpty('tags'));
-        $this->addAssetVariantFilterClause($query);
+        $this->addAssetVariantToQueryConstraints($query);
         $this->addAssetCollectionToQueryConstraints($query, $assetCollection);
         return $query->execute();
     }
@@ -199,7 +201,7 @@ class AssetRepository extends Repository
      * @param AssetCollection $assetCollection
      * @return integer
      */
-    public function countUntagged(AssetCollection $assetCollection = null): int
+    public function countUntagged(?AssetCollection $assetCollection = null): int
     {
         $rsm = new ResultSetMapping();
         $rsm->addScalarResult('c', 'c');
@@ -229,7 +231,7 @@ class AssetRepository extends Repository
     public function findByAssetCollection(AssetCollection $assetCollection): QueryResultInterface
     {
         $query = $this->createQuery();
-        $this->addAssetVariantFilterClause($query);
+        $this->addAssetVariantToQueryConstraints($query);
         $this->addAssetCollectionToQueryConstraints($query, $assetCollection);
         return $query->execute();
     }
@@ -262,7 +264,7 @@ class AssetRepository extends Repository
      * @return void
      * @throws InvalidQueryException
      */
-    protected function addAssetCollectionToQueryConstraints(QueryInterface $query, AssetCollection $assetCollection = null): void
+    protected function addAssetCollectionToQueryConstraints(QueryInterface $query, ?AssetCollection $assetCollection = null): void
     {
         if ($assetCollection === null) {
             return;
@@ -278,14 +280,20 @@ class AssetRepository extends Repository
      * @param Query $query
      * @return void
      */
-    protected function addAssetVariantFilterClause(Query $query): void
+    protected function addAssetVariantToQueryConstraints(QueryInterface $query): void
     {
-        $queryBuilder = $query->getQueryBuilder();
-
+        $variantsConstraints = [];
         $variantClassNames = $this->reflectionService->getAllImplementationClassNamesForInterface(AssetVariantInterface::class);
         foreach ($variantClassNames as $variantClassName) {
-            $queryBuilder->andWhere('e NOT INSTANCE OF ' . $variantClassName);
+            if (!$this->reflectionService->isClassAnnotatedWith($variantClassName, Flow\Entity::class)) {
+                // ignore non-entity classes to prevent "class schema found" error
+                continue;
+            }
+            $variantsConstraints[] = 'e NOT INSTANCE OF ' . $variantClassName;
         }
+
+        $constraints = $query->getConstraint();
+        $query->matching($query->logicalAnd([$constraints, $query->logicalAnd($variantsConstraints)]));
     }
 
     /**
@@ -321,40 +329,17 @@ class AssetRepository extends Repository
     }
 
     /**
-     * Iterate over an IterableResult and return a Generator
+     * Find all objects and return an iterable
      *
-     * This method is useful for batch processing huge result set as it clears the object
-     * manager and detaches the current object on each iteration.
-     *
-     * @param IterableResult $iterator
-     * @param callable $callback
-     * @return \Generator
+     * @return iterable<AssetInterface>
      */
-    public function iterate(IterableResult $iterator, callable $callback = null): ?\Generator
-    {
-        $iteration = 0;
-        foreach ($iterator as $object) {
-            $object = current($object);
-            yield $object;
-            if ($callback !== null) {
-                $callback($iteration, $object);
-            }
-            $iteration++;
-        }
-    }
-
-    /**
-     * Find all objects and return an IterableResult
-     *
-     * @return IterableResult
-     */
-    public function findAllIterator(): IterableResult
+    public function findAllIterator(): iterable
     {
         /** @var Query $query */
         $query = $this->createQuery();
-        $this->addAssetVariantFilterClause($query);
+        $this->addAssetVariantToQueryConstraints($query);
 
-        return $query->getQueryBuilder()->getQuery()->iterate();
+        return $query->getQueryBuilder()->getQuery()->toIterable();
     }
 
     /**

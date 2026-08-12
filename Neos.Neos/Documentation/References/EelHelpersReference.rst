@@ -3,34 +3,7 @@
 Eel Helpers Reference
 =====================
 
-This reference was automatically generated from code on 2023-06-28
-
-
-.. _`Eel Helpers Reference: Api`:
-
-Api
----
-
-
-
-Implemented in: ``Neos\Neos\Ui\Fusion\Helper\ApiHelper``
-
-Api.emptyArrayToObject(array)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Converts an empty array to an empty object. Does nothing if array is not empty.
-
-Use this helper to prevent associative arrays from being converted to non-associative arrays by json_encode.
-This is an internal helper and might change without further notice
-FIXME: Probably better to produce objects in the first place "upstream".
-
-* ``array`` (array) Associative array which may be empty
-
-**Return** (array|\stdClass) Non-empty associative array or empty object
-
-
-
-
+This reference was automatically generated from code on 2026-08-09
 
 
 .. _`Eel Helpers Reference: Array`:
@@ -450,32 +423,6 @@ Examples::
 
 
 
-.. _`Eel Helpers Reference: ContentDimensions`:
-
-ContentDimensions
------------------
-
-
-
-Implemented in: ``Neos\Neos\Ui\Fusion\Helper\ContentDimensionsHelper``
-
-ContentDimensions.allowedPresetsByName(dimensions)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``dimensions`` (array) Dimension values indexed by dimension name
-
-**Return** (array) Allowed preset names for the given dimension combination indexed by dimension name
-
-ContentDimensions.contentDimensionsByName()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-**Return** (array) Dimensions indexed by name with presets indexed by name
-
-
-
-
-
-
 .. _`Eel Helpers Reference: Date`:
 
 Date
@@ -548,6 +495,39 @@ Format a date to a string with a given cldr format
 * ``date`` (integer|string|\DateTime)
 * ``cldrFormat`` (string) Format string in CLDR format (see http://cldr.unicode.org/translation/date-time)
 * ``locale`` (null|string, *optional*) String locale - example (de|en|ru_RU)
+
+**Return** (string)
+
+Date.formatCldrDate(dateTime, formatLength, locale)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Format a date to a string with a given cldr formatLength
+
+* ``dateTime`` (\DateTimeInterface)
+* ``formatLength`` (string, *optional*) FormatLength in CLDR format ("Full", "Long", "Medium", "Short") (see https://cldr.unicode.org/translation/date-time/date-time-patterns#basic-date-formats)
+* ``locale`` (null|string, *optional*) String locale - example (de|en|en_US). If not provided the current locale of I18nService is used.
+
+**Return** (string)
+
+Date.formatCldrDateTime(dateTime, formatLength, locale)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Format a datetime to a string with a given cldr formatLength
+
+* ``dateTime`` (\DateTimeInterface)
+* ``formatLength`` (string, *optional*) FormatLength in CLDR format ("Full", "Long", "Medium", "Short") (see https://cldr.unicode.org/translation/date-time/date-time-patterns#basic-date-formats and https://cldr.unicode.org/translation/date-time/date-time-patterns#basic-date-formats)
+* ``locale`` (null|string, *optional*) String locale - example (de|en|en_US). If not provided the current locale of I18nService is used.
+
+**Return** (string)
+
+Date.formatCldrTime(dateTime, formatLength, locale)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Format a time to a string with a given cldr formatLength
+
+* ``dateTime`` (\DateTimeInterface)
+* ``formatLength`` (string, *optional*) FormatLength in CLDR format ("Full", "Long", "Medium", "Short") (see https://cldr.unicode.org/translation/date-time/date-time-patterns#basic-time-formats)
+* ``locale`` (null|string, *optional*) String locale - example (de|en|en_US). If not provided the current locale of I18nService is used.
 
 **Return** (string)
 
@@ -1119,7 +1099,7 @@ Get the sign of the given number, indicating whether the number is positive, neg
 
 * ``x`` (integer|float) The value
 
-**Return** (integer) -1, 0, 1 depending on the sign or NAN if the given value was not numeric
+**Return** (integer|float) -1, 0, 1 depending on the sign or NAN if the given value was not numeric
 
 Math.sin(x)
 ^^^^^^^^^^^
@@ -1189,30 +1169,49 @@ Neos.Array.filter(set, filterProperty)
 
 Filter an array of objects, by only keeping the elements where each object's $filterProperty evaluates to true.
 
-* ``set`` (array|Collection)
+* ``set`` (array<mixed>|Collection<int|string,mixed>)
 * ``filterProperty`` (string)
 
-**Return** (array)
+**Return** (array<mixed>)
 
 Neos.Array.filterNegated(set, filterProperty)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Filter an array of objects, by only keeping the elements where each object's $filterProperty evaluates to false.
 
-* ``set`` (array|Collection)
+* ``set`` (array<mixed>|Collection<int|string,mixed>)
 * ``filterProperty`` (string)
 
-**Return** (array)
+**Return** (array<mixed>)
 
 Neos.Array.groupBy(set, groupingKey)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The input is assumed to be an array or Collection of objects. Groups this input by the $groupingKey property of each element.
+The input is assumed to be an array or Collection of objects.
+Groups this input by the $groupingKey property of each element.
 
-* ``set`` (array|Collection)
+* ``set`` (array<mixed>|Collection<int|string,mixed>)
 * ``groupingKey`` (string)
 
-**Return** (array)
+**Return** (array<mixed>)
+
+Neos.Array.sortByPropertyPath(set, positionPropertyPath)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Sorts the input array by the $positionProperty of each element.
+
+* ``set`` (array<mixed>)
+
+**Return** (array<mixed>)
+
+Neos.Array.toHtmlAttributesString(attributes)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Converts an array into an HTML attributes string like 'class="foo" id="bar"'
+
+* ``attributes`` (array<string>)
+
+**Return** (string)
 
 
 
@@ -1238,6 +1237,8 @@ Example::
 
     Translation.id("mh").locale(Neos.Backend.interfaceLanguage()).translate()
 
+**Return** (string)
+
 
 
 
@@ -1260,9 +1261,18 @@ A cache entry with this tag will be flushed whenever a node
 (for any variant) that is a descendant (child on any level) of one of
 the given nodes is updated.
 
-* ``nodes`` (mixed) (A single Node or array or \Traversable of Nodes)
+* ``nodes`` (iterable<Node>|Node) (A single Node or array or \Traversable of Nodes)
 
-**Return** (array)
+**Return** (array<int,string>)
+
+Neos.Caching.entryIdentifierForNode(node)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Generate a `@cache` entry identifier for a given node:
+
+    entryIdentifier {
+      documentNode = ${Neos.Caching.entryIdentifierForNode(documentNode)}
+    }
 
 Neos.Caching.nodeTag(nodes)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1271,40 +1281,117 @@ Generate a `@cache` entry tag for a single node, array of nodes or a FlowQuery r
 A cache entry with this tag will be flushed whenever one of the
 given nodes (for any variant) is updated.
 
-* ``nodes`` (mixed) (A single Node or array or \Traversable of Nodes)
+* ``nodes`` (iterable<Node>|Node) (A single Node or array or \Traversable of Nodes)
 
-**Return** (array)
+**Return** (array<int,string>,)
 
 Neos.Caching.nodeTagForIdentifier(identifier, contextNode)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Generate a `@cache` entry tag for a single node identifier. If a NodeInterface $contextNode is given the
-entry tag will respect the workspace hash.
+Generate a `@cache` entry tag for a single node identifier.
 
 * ``identifier`` (string)
-* ``contextNode`` (NodeInterface|null, *optional*)
+* ``contextNode`` (Node)
 
-**Return** (string)
+**Return** (string[])
 
-Neos.Caching.nodeTypeTag(nodeType, contextNode)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Neos.Caching.nodeTypeTag(nodeTypes, contextNode)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Generate an `@cache` entry tag for a node type
 A cache entry with this tag will be flushed whenever a node
-(for any variant) that is of the given node type(s)
+(for any variant) that is of the given node type name(s)
 (including inheritance) is updated.
 
-* ``nodeType`` (string|NodeType|string[]|NodeType[])
-* ``contextNode`` (NodeInterface|null, *optional*)
+* ``nodeTypes`` (iterable<string>|string)
 
-**Return** (string|string[])
+**Return** (array<int,string>)
 
-Neos.Caching.renderWorkspaceTagForContextNode(workspaceName)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* ``workspaceName`` (string)
 
-**Return** (string)
+
+
+
+.. _`Eel Helpers Reference: Neos.Dimension`:
+
+Neos.Dimension
+--------------
+
+Helper for nodes in various content dimensions.
+
+Implemented in: ``Neos\Neos\Fusion\Helper\DimensionHelper``
+
+Neos.Dimension.all(subject)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Find all content dimensions in content repository defined by `contentRepositoryId` or `node`.
+
+Example::
+
+    Neos.Dimension.all(contentRepositoryId)
+    Neos.Dimension.all(node)
+
+* ``subject`` (ContentRepositoryId|Node) Node will be used to determine `ContentRepositoryId`
+
+**Return** (array<string,ContentDimension>)
+
+Neos.Dimension.allDimensionValues(subject, dimensionName)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Find all content dimension values in content repository defined by `contentRepositoryId` or `node`.
+
+Example::
+
+    Neos.Dimension.allDimensionValues(contentRepositoryId, 'language')
+    Neos.Dimension.allDimensionValues(node, 'language')
+
+* ``subject`` (ContentRepositoryId|Node) Node will be used to determine `ContentRepositoryId`
+* ``dimensionName`` (ContentDimensionId|string) String will be converted to `ContentDimensionId`
+
+**Return** (ContentDimensionValues|null)
+
+Neos.Dimension.currentValue(node, dimensionName)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Get current dimension value for `node`.
+
+Example::
+
+    Neos.Dimension.currentValue(node, 'language')
+
+* ``node`` (Node)
+* ``dimensionName`` (ContentDimensionId|string) String will be converted to `ContentDimensionId`
+
+**Return** (ContentDimensionValue|null)
+
+Neos.Dimension.findVariantInDimension(node, dimensionName, dimensionValue)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Find the variant of `node` in the specified dimension and value.
+
+Example::
+
+    Neos.Dimension.findVariantInDimension(node, 'language', 'en_UK')
+
+* ``node`` (Node)
+* ``dimensionName`` (ContentDimensionId|string) String will be converted to `ContentDimensionId`
+* ``dimensionValue`` (ContentDimensionValue|string) String will be converted to `ContentDimensionValue`
+
+**Return** (Node|null)
+
+Neos.Dimension.originValue(node, dimensionName)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Get original dimension value for `node`. Differs form current value in cases of dimension fallback.
+
+Example::
+
+    Neos.Dimension.originValue(node, 'language')
+
+* ``node`` (Node)
+* ``dimensionName`` (ContentDimensionId|string) String will be converted to `ContentDimensionId`
+
+**Return** (ContentDimensionValue|null)
 
 
 
@@ -1316,47 +1403,21 @@ Neos.Caching.renderWorkspaceTagForContextNode(workspaceName)
 Neos.Link
 ---------
 
-Eel helper for the linking service
+
 
 Implemented in: ``Neos\Neos\Fusion\Helper\LinkHelper``
 
 Neos.Link.convertUriToObject(uri, contextNode)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* ``uri`` (string|UriInterface)
-* ``contextNode`` (NodeInterface, *optional*)
-
-**Return** (NodeInterface|AssetInterface|NULL)
-
 Neos.Link.getScheme(uri)
 ^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``uri`` (string|UriInterface)
-
-**Return** (string)
 
 Neos.Link.hasSupportedScheme(uri)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-* ``uri`` (string|UriInterface)
-
-**Return** (boolean)
-
 Neos.Link.resolveAssetUri(uri)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``uri`` (string|UriInterface)
-
-**Return** (string)
-
-Neos.Link.resolveNodeUri(uri, contextNode, controllerContext)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``uri`` (string|UriInterface)
-* ``contextNode`` (NodeInterface)
-* ``controllerContext`` (ControllerContext)
-
-**Return** (string)
 
 
 
@@ -1394,6 +1455,36 @@ Neos.Media.Assets.search(searchTerm, tags, collection)
 
 
 
+.. _`Eel Helpers Reference: Neos.Media.Image`:
+
+Neos.Media.Image
+----------------
+
+
+
+Implemented in: ``Neos\Media\Eel\ImageHelper``
+
+Neos.Media.Image.createThumbnail(asset, preset, width, maximumWidth, height, maximumHeight, allowCropping, allowUpScaling, async, quality, format)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Returns a thumbnail of the given asset, allowing integrators to access the thumbnail size and other metadata.
+
+* ``preset`` (string|null, *optional*) Name of the preset that should be used as basis for the configuration
+* ``width`` (integer|null, *optional*) Desired width of the image
+* ``maximumWidth`` (integer|null, *optional*) Desired maximum width of the image
+* ``height`` (integer|null, *optional*) Desired height of the image
+* ``maximumHeight`` (integer|null, *optional*) Desired maximum height of the image
+* ``allowCropping`` (boolean, *optional*) Whether the image should be cropped if the given sizes would hurt the aspect ratio
+* ``allowUpScaling`` (boolean, *optional*) Whether the resulting image size might exceed the size of the original image
+* ``async`` (boolean, *optional*) Whether the thumbnail can be generated asynchronously
+* ``quality`` (integer|null, *optional*) Quality of the processed image
+* ``format`` (string|null, *optional*) Format for the image, only jpg, jpeg, gif, png, wbmp, xbm, webp and bmp are supported.
+
+
+
+
+
+
 .. _`Eel Helpers Reference: Neos.Node`:
 
 Neos.Node
@@ -1403,25 +1494,32 @@ Eel helper for ContentRepository Nodes
 
 Implemented in: ``Neos\Neos\Fusion\Helper\NodeHelper``
 
+Neos.Node.isDisabled(node)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Neos.Node.isNodeTypeExistent(node)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 Neos.Node.isOfType(node, nodeType)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 If this node type or any of the direct or indirect super types
 has the given name.
 
-* ``node`` (NodeInterface)
-* ``nodeType`` (string)
+Neos.Node.label(node)
+^^^^^^^^^^^^^^^^^^^^^
 
-**Return** (bool)
+Renders the actual node label based on the NodeType definition in Fusion.
 
 Neos.Node.labelForNode(node)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Generate a label for a node with a chaining mechanism. To be used in nodetype definitions.
+Return a builder to generate a label for a node with a chaining mechanism. To be used in NodeType definition:
 
-* ``node`` (NodeInterface|null, *optional*)
+    'Vendor.Site:MyContent':
+      label: "${Neos.Node.labelForNode(node).prefix('foo')}"
 
-**Return** (NodeLabelToken)
+FIXME the method name is slightly ambiguous and not to confused with Neos.Node.label which renders the configured label from yaml
 
 Neos.Node.nearestContentCollection(node, nodePath)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1429,51 +1527,22 @@ Neos.Node.nearestContentCollection(node, nodePath)
 Check if the given node is already a collection, find collection by nodePath otherwise, throw exception
 if no content collection could be found
 
-* ``node`` (NodeInterface)
-* ``nodePath`` (string)
+Neos.Node.nodeType(node)
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Return** (NodeInterface)
+Retrieving the NodeType of the given Node.
 
+If the NodeType schema changed and the NodeType does not exist anymore, NULL is returned.
 
+* ``node`` (Node)
 
+**Return** (NodeType|null)
 
+Neos.Node.serializedNodeAddress(node)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-
-.. _`Eel Helpers Reference: Neos.Rendering`:
-
-Neos.Rendering
---------------
-
-Render Content Dimension Names, Node Labels
-
-These helpers are *WORK IN PROGRESS* and *NOT STABLE YET*
-
-Implemented in: ``Neos\Neos\Fusion\Helper\RenderingHelper``
-
-Neos.Rendering.injectConfigurationManager(configurationManager)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``configurationManager`` (ConfigurationManager)
-
-**Return** (void)
-
-Neos.Rendering.labelForNodeType(nodeTypeName)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Render the label for the given $nodeTypeName
-
-* ``nodeTypeName`` (string)
-
-**Return** (string)
-
-Neos.Rendering.renderDimensions(dimensions)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Render a human-readable description for the passed $dimensions
-
-* ``dimensions`` (array)
-
-**Return** (string)
+Neos.Node.subgraphForNode(node)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 
@@ -1511,150 +1580,17 @@ Neos.Seo.Image.createThumbnail(asset, preset, width, maximumWidth, height, maxim
 
 
 
-.. _`Eel Helpers Reference: Neos.Ui.PositionalArraySorter`:
+.. _`Eel Helpers Reference: Neos.Site`:
 
-Neos.Ui.PositionalArraySorter
------------------------------
+Neos.Site
+---------
 
+Eel helper for accessing the Site object
 
+Implemented in: ``Neos\Neos\Fusion\Helper\SiteHelper``
 
-Implemented in: ``Neos\Neos\Ui\Fusion\Helper\PositionalArraySorterHelper``
-
-Neos.Ui.PositionalArraySorter.sort(array, positionPath)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``array`` (array)
-* ``positionPath`` (string, *optional*)
-
-**Return** (array)
-
-
-
-
-
-
-.. _`Eel Helpers Reference: Neos.Ui.StaticResources`:
-
-Neos.Ui.StaticResources
------------------------
-
-
-
-Implemented in: ``Neos\Neos\Ui\Fusion\Helper\StaticResourcesHelper``
-
-Neos.Ui.StaticResources.compiledResourcePackage()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
-
-
-
-
-.. _`Eel Helpers Reference: Neos.Ui.Workspace`:
-
-Neos.Ui.Workspace
------------------
-
-
-
-Implemented in: ``Neos\Neos\Ui\Fusion\Helper\WorkspaceHelper``
-
-Neos.Ui.Workspace.getAllowedTargetWorkspaces()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Neos.Ui.Workspace.getPersonalWorkspace()
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Neos.Ui.Workspace.getPublishableNodeInfo(workspace)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``workspace`` (Workspace)
-
-**Return** (array)
-
-
-
-
-
-
-.. _`Eel Helpers Reference: NodeInfo`:
-
-NodeInfo
---------
-
-
-
-Implemented in: ``Neos\Neos\Ui\Fusion\Helper\NodeInfoHelper``
-
-NodeInfo.createRedirectToNode(controllerContext, node)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Creates a URL that will redirect to the given $node in live or base workspace, or returns an empty string if that doesn't exist or is inaccessible
-
-* ``controllerContext`` (ControllerContext)
-* ``node`` (NodeInterface|null, *optional*)
-
-**Return** (string)
-
-NodeInfo.defaultNodesForBackend(site, documentNode, controllerContext)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``site`` (NodeInterface)
-* ``documentNode`` (NodeInterface)
-* ``controllerContext`` (ControllerContext)
-
-**Return** (array)
-
-NodeInfo.renderDocumentNodeAndChildContent(documentNode, controllerContext)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``documentNode`` (NodeInterface)
-* ``controllerContext`` (ControllerContext)
-
-**Return** (array)
-
-NodeInfo.renderNodeWithMinimalPropertiesAndChildrenInformation(node, controllerContext, nodeTypeFilterOverride)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``node`` (NodeInterface)
-* ``controllerContext`` (ControllerContext|null, *optional*)
-* ``nodeTypeFilterOverride`` (string, *optional*)
-
-**Return** (array|null)
-
-NodeInfo.renderNodeWithPropertiesAndChildrenInformation(node, controllerContext, nodeTypeFilterOverride)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``node`` (NodeInterface)
-* ``controllerContext`` (ControllerContext|null, *optional*)
-* ``nodeTypeFilterOverride`` (string, *optional*)
-
-**Return** (array|null)
-
-NodeInfo.renderNodes(nodes, controllerContext, omitMostPropertiesForTreeState)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``nodes`` (array)
-* ``controllerContext`` (ControllerContext)
-* ``omitMostPropertiesForTreeState`` (bool, *optional*)
-
-**Return** (array)
-
-NodeInfo.renderNodesWithParents(nodes, controllerContext)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``nodes`` (array)
-* ``controllerContext`` (ControllerContext)
-
-**Return** (array)
-
-NodeInfo.uri(node, controllerContext)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-* ``node`` (NodeInterface)
-* ``controllerContext`` (ControllerContext)
-
-**Return** (string)
+Neos.Site.findBySiteNode(siteNode)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 
@@ -2014,7 +1950,7 @@ Example::
 * ``string`` (string) The input string
 * ``pattern`` (string) A PREG pattern
 
-**Return** (array) The matches as array or NULL if not matched
+**Return** (array|null) The matches as array or NULL if not matched
 
 String.pregMatchAll(string, pattern)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2029,7 +1965,7 @@ Example::
 * ``string`` (string) The input string
 * ``pattern`` (string) A PREG pattern
 
-**Return** (array) The matches as array or NULL if not matched
+**Return** (array|null) The matches as array or NULL if not matched
 
 String.pregReplace(string, pattern, replace, limit)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -2091,14 +2027,15 @@ Replace occurrences of a search string inside the string
 Example::
 
     String.replace("canal", "ana", "oo") == "cool"
+    String.replace("cool gridge", ["oo", "gri"], ["ana", "bri"]) == "canal bridge"
 
 Note: this method does not perform regular expression matching, @see pregReplace().
 
-* ``string`` (string) The input string
-* ``search`` (string) A search string
-* ``replace`` (string) A replacement string
+* ``string`` (array|string|null) The input string
+* ``search`` (array|string|null) A search string
+* ``replace`` (array|string|null) A replacement string
 
-**Return** (string) The string with all occurrences replaced
+**Return** (array|string|string[]) The string with all occurrences replaced
 
 String.sha1(string)
 ^^^^^^^^^^^^^^^^^^^

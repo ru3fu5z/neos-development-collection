@@ -76,6 +76,12 @@
     padding: 0;
   }
 
+	.neos-menu-bottom-wrapper {
+		bottom: 0;
+		position: absolute;
+		width: 100%;
+	}
+
   .neos-menu-panel-open & {
     left: 0;
     display: block;
@@ -191,6 +197,7 @@
       a,
       span.neos-menu-item {
         padding-left: $menuButtonWidth;
+        text-decoration: none;
         position: relative;
         font-weight: normal;
       }

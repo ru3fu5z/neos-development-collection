@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\TypeConverter;
@@ -45,7 +46,7 @@ class AspectRatioFromStringConverter extends ObjectConverter
      * @param PropertyMappingConfigurationInterface|null $configuration
      * @return AspectRatio|object
      */
-    public function convertFrom($source, $targetType, array $convertedChildProperties = [], PropertyMappingConfigurationInterface $configuration = null)
+    public function convertFrom($source, $targetType, array $convertedChildProperties = [], ?PropertyMappingConfigurationInterface $configuration = null)
     {
         try {
             return AspectRatio::fromString($source);

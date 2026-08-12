@@ -3,7 +3,7 @@
 Neos ViewHelper Reference
 #########################
 
-This reference was automatically generated from code on 2023-06-28
+This reference was automatically generated from code on 2026-08-09
 
 
 .. _`Neos ViewHelper Reference: neos:backend.authenticationProviderLabel`:
@@ -22,27 +22,6 @@ Arguments
 *********
 
 * ``identifier`` (string): The identifier to render the label for
-
-
-
-
-.. _`Neos ViewHelper Reference: neos:backend.changeStats`:
-
-neos:backend.changeStats
-------------------------
-
-Displays a text-based "bar graph" giving an indication of the amount and type of
-changes done to something. Created for use in workspace management.
-
-:Implementation: Neos\\Neos\\ViewHelpers\\Backend\\ChangeStatsViewHelper
-
-
-
-
-Arguments
-*********
-
-* ``changeCounts`` (array): Expected keys: new, changed, removed
 
 
 
@@ -133,7 +112,7 @@ Render a bread crumb path by using the labels of documents leading to the given 
 Arguments
 *********
 
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface): Node
+* ``node`` (Neos\ContentRepository\Core\Projection\ContentGraph\Node): Node
 
 
 
@@ -145,7 +124,8 @@ neos:backend.ifModuleAccessible
 
 Condition ViewHelper that can evaluate whether the currently authenticated user can access a given Backend module
 
-Note: This is a quick fix for https://github.com/neos/neos-development-collection/issues/2854 that will be obsolete once the whole Backend module logic is rewritten
+Note: This is a quick fix for https://github.com/neos/neos-development-collection/issues/2854
+that will be obsolete once the whole Backend module logic is rewritten
 
 :Implementation: Neos\\Neos\\ViewHelpers\\Backend\\IfModuleAccessibleViewHelper
 
@@ -294,7 +274,9 @@ Expected result::
 
 **Arguments**::
 
-	<neos:backend.translate arguments="{0: 'foo', 1: '99.9'}"><![CDATA[Untranslated {0} and {1,number}]]></neos:backend.translate>
+	<neos:backend.translate arguments="{0: 'foo', 1: '99.9'}">
+	     <![CDATA[Untranslated {0} and {1,number}]]>
+	</neos:backend.translate>
 
 
 Expected result::
@@ -400,7 +382,7 @@ Arguments
 
 * ``tag`` (string, *optional*): The name of the tag that should be wrapped around the property. By default this is a <div>
 
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface, *optional*): The node of the content element. Optional, will be resolved from the Fusion context by default
+* ``node`` (Neos\ContentRepository\Core\Projection\ContentGraph\Node, *optional*): The node of the content element. Optional, will be resolved from the Fusion context by default
 
 
 
@@ -427,7 +409,7 @@ templates. This is useful if you want to make properties of a custom document no
 Arguments
 *********
 
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface, *optional*): Node
+* ``node`` (Neos\ContentRepository\Core\Projection\ContentGraph\Node, *optional*): Node
 
 
 
@@ -535,9 +517,9 @@ Arguments
 
 * ``additionalParams`` (array, *optional*): additional query parameters that won't be prefixed like $arguments (overrule $arguments)
 
-* ``addQueryString`` (boolean, *optional*): If set, the current query parameters will be kept in the URI
+* ``addQueryString`` (boolean, *optional*): Deprecated with Neos 9. If set, the current query parameters will be kept in the URI
 
-* ``argumentsToBeExcludedFromQueryString`` (array, *optional*): arguments to be removed from the URI. Only active if $addQueryString = true
+* ``argumentsToBeExcludedFromQueryString`` (array, *optional*): Deprecated with Neos 9. arguments to be removed from the URI. Only active if $addQueryString = true
 
 
 
@@ -634,15 +616,9 @@ Arguments
 
 * ``section`` (string, *optional*): The anchor to be added to the URI
 
-* ``addQueryString`` (boolean, *optional*): If set, the current query parameters will be kept in the URI
-
-* ``argumentsToBeExcludedFromQueryString`` (array, *optional*): arguments to be removed from the URI. Only active if $addQueryString = true
-
 * ``baseNodeName`` (string, *optional*): The name of the base node inside the Fusion context to use for the ContentContext or resolving relative paths
 
 * ``nodeVariableName`` (string, *optional*): The variable the node will be assigned to for the rendered child content
-
-* ``resolveShortcuts`` (boolean, *optional*): DEPRECATED Parameter - ignored
 
 
 
@@ -744,7 +720,27 @@ ViewHelper to find the closest document node to a given node
 Arguments
 *********
 
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface): Node
+* ``node`` (Neos\ContentRepository\Core\Projection\ContentGraph\Node): Node
+
+
+
+
+.. _`Neos ViewHelper Reference: neos:node.label`:
+
+neos:node.label
+---------------
+
+Viewhelper to render a label for a given Node
+
+:Implementation: Neos\\Neos\\ViewHelpers\\Node\\LabelViewHelper
+
+
+
+
+Arguments
+*********
+
+* ``node`` (Neos\ContentRepository\Core\Projection\ContentGraph\Node): Node
 
 
 
@@ -758,13 +754,6 @@ ViewHelper to find out if Neos is rendering the backend.
 
 :Implementation: Neos\\Neos\\ViewHelpers\\Rendering\\InBackendViewHelper
 
-
-
-
-Arguments
-*********
-
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface, *optional*): Node
 
 
 
@@ -805,8 +794,6 @@ ViewHelper to find out if Neos is rendering an edit mode.
 
 Arguments
 *********
-
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface, *optional*): Optional Node to use context from
 
 * ``mode`` (string, *optional*): Optional rendering mode name to check if this specific mode is active
 
@@ -867,8 +854,6 @@ ViewHelper to find out if Neos is rendering a preview mode.
 Arguments
 *********
 
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface, *optional*): Optional Node to use context from
-
 * ``mode`` (string, *optional*): Optional rendering mode name to check if this specific mode is active
 
 
@@ -924,13 +909,6 @@ the ViewHelper or have "node" set as template variable at least.
 
 :Implementation: Neos\\Neos\\ViewHelpers\\Rendering\\LiveViewHelper
 
-
-
-
-Arguments
-*********
-
-* ``node`` (Neos\ContentRepository\Domain\Model\NodeInterface, *optional*): Node
 
 
 
@@ -1026,9 +1004,9 @@ Arguments
 
 * ``additionalParams`` (string, *optional*): additional query parameters that won't be prefixed like $arguments (overrule $arguments)
 
-* ``addQueryString`` (string, *optional*): If set, the current query parameters will be kept in the URI
+* ``addQueryString`` (string, *optional*): Deprecated with Neos 9. If set, the current query parameters will be kept in the URI
 
-* ``argumentsToBeExcludedFromQueryString`` (string, *optional*): arguments to be removed from the URI. Only active if $addQueryString = true
+* ``argumentsToBeExcludedFromQueryString`` (string, *optional*): Deprecated with Neos 9. arguments to be removed from the URI. Only active if $addQueryString = true
 
 
 
@@ -1068,8 +1046,6 @@ Example: ``/sites/acmecom/home/about/us``
 The given path is treated as a path relative to the current node.
 Examples: given that the current node is ``/sites/acmecom/products/``,
 ``stapler`` results in ``/sites/acmecom/products/stapler``,
-``../about`` results in ``/sites/acmecom/about/``,
-``./neos/info`` results in ``/sites/acmecom/products/neos/info``.
 
 *``node`` starts with a tilde character (``~``):*
 The given path is treated as a path relative to the current site node.
@@ -1095,13 +1071,9 @@ Arguments
 
 * ``section`` (string, *optional*): The anchor to be added to the URI
 
-* ``addQueryString`` (boolean, *optional*): If set, the current query parameters will be kept in the URI
-
-* ``argumentsToBeExcludedFromQueryString`` (array, *optional*): arguments to be removed from the URI. Only active if $addQueryString = true
-
 * ``baseNodeName`` (string, *optional*): The name of the base node inside the Fusion context to use for the ContentContext or resolving relative paths
 
-* ``resolveShortcuts`` (boolean, *optional*): DEPRECATED Parameter - ignored
+* ``nodeVariableName`` (string, *optional*): The variable the node will be assigned to for the rendered child content
 
 
 

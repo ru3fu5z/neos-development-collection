@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\Service;
@@ -140,7 +141,7 @@ class AssetService
      * @throws MissingActionNameException
      * @throws HttpException
      */
-    public function getThumbnailUriAndSizeForAsset(AssetInterface $asset, ThumbnailConfiguration $configuration, ActionRequest $request = null): ?array
+    public function getThumbnailUriAndSizeForAsset(AssetInterface $asset, ThumbnailConfiguration $configuration, ?ActionRequest $request = null): ?array
     {
         $thumbnailImage = $this->thumbnailService->getThumbnail($asset, $configuration);
         if (!$thumbnailImage instanceof ImageInterface) {
@@ -275,7 +276,7 @@ class AssetService
         $resourceMediaType = $resource->getMediaType();
         $asset->setResource($resource);
 
-        if (isset($options['keepOriginalFilename']) && (boolean)$options['keepOriginalFilename'] === true) {
+        if (isset($options['keepOriginalFilename']) && (bool)$options['keepOriginalFilename'] === true) {
             $originalFilename = $originalAssetResource->getFilename();
             if (MediaTypes::getMediaTypeFromFilename($originalFilename) !== $resourceMediaType) {
                 $originalFileExtension = $originalAssetResource->getFileExtension();
@@ -288,7 +289,7 @@ class AssetService
         }
 
         $uriMapping = [];
-        $redirectHandlerEnabled = isset($options['generateRedirects']) && (boolean)$options['generateRedirects'] === true && $this->packageManager->isPackageAvailable('Neos.RedirectHandler');
+        $redirectHandlerEnabled = isset($options['generateRedirects']) && (bool)$options['generateRedirects'] === true && $this->packageManager->isPackageAvailable('Neos.RedirectHandler');
         if ($redirectHandlerEnabled) {
             $originalAssetResourceUri = new Uri($this->resourceManager->getPublicPersistentResourceUri($originalAssetResource));
             $newAssetResourceUri = new Uri($this->resourceManager->getPublicPersistentResourceUri($asset->getResource()));
@@ -323,7 +324,9 @@ class AssetService
                     $variant->refresh();
                     foreach ($variant->getAdjustments() as $adjustment) {
                         if (method_exists($adjustment, 'refit') && $this->imageService->getImageSize($originalAssetResource) !== $this->imageService->getImageSize($resource)) {
-                            $adjustment->refit($asset);
+                            if ($asset instanceof ImageInterface && $asset->getWidth() !== null && $asset->getHeight() !== null) {
+                                $adjustment->refit($asset);
+                            }
                         }
                     }
                     $this->getRepository($variant)->update($variant);
@@ -337,7 +340,7 @@ class AssetService
             }
         }
 
-        if ($redirectHandlerEnabled) {
+        if ($redirectHandlerEnabled && interface_exists(RedirectStorageInterface::class)) {
             /** @var RedirectStorageInterface $redirectStorage */
             $redirectStorage = $this->objectManager->get(RedirectStorageInterface::class);
             foreach ($uriMapping as $originalUri => $newUri) {

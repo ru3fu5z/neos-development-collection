@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Browser\Controller;
 
 /*
@@ -16,9 +17,7 @@ use Neos\Flow\Mvc\Controller\ActionController;
 use Neos\Media\Domain\Service\AssetSourceService;
 use Neos\Media\Exception\AssetSourceServiceException;
 
-/**
- * @Flow\Scope("singleton")
- */
+#[Flow\Scope('singleton')]
 class AssetProxyController extends ActionController
 {
     /**

@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Domain\Service;
 
 /*
@@ -17,21 +18,21 @@ use Imagine\Image\Palette\CMYK;
 use Imagine\Image\Palette\RGB;
 use Imagine\Imagick\Imagine;
 use Neos\Cache\Frontend\VariableFrontend;
+use Neos\Flow\Annotations as Flow;
+use Neos\Flow\Configuration\Exception\InvalidConfigurationException;
 use Neos\Flow\ResourceManagement\Exception;
+use Neos\Flow\ResourceManagement\PersistentResource;
 use Neos\Flow\ResourceManagement\ResourceManager;
 use Neos\Flow\Utility\Algorithms;
 use Neos\Flow\Utility\Environment;
+use Neos\Media\Domain\Model\Adjustment\ImageAdjustmentInterface;
 use Neos\Media\Domain\Model\Adjustment\QualityImageAdjustment;
 use Neos\Media\Domain\Repository\AssetRepository;
-use Neos\Media\Imagine\Box;
-use Neos\Flow\Annotations as Flow;
-use Neos\Flow\Configuration\Exception\InvalidConfigurationException;
-use Neos\Flow\ResourceManagement\PersistentResource;
-use Neos\Utility\Arrays;
-use Neos\Utility\Unicode\Functions as UnicodeFunctions;
-use Neos\Media\Domain\Model\Adjustment\ImageAdjustmentInterface;
 use Neos\Media\Exception\ImageFileException;
 use Neos\Media\Exception\ImageServiceException;
+use Neos\Media\Imagine\Box;
+use Neos\Utility\Arrays;
+use Neos\Utility\Unicode\Functions as UnicodeFunctions;
 
 /**
  * An image service that acts as abstraction for the Imagine library
@@ -98,7 +99,7 @@ class ImageService
      * @throws InvalidConfigurationException
      * @throws Exception
      */
-    public function processImage(PersistentResource $originalResource, array $adjustments, string $format = null)
+    public function processImage(PersistentResource $originalResource, array $adjustments, ?string $format = null)
     {
         $additionalOptions = [];
         $adjustmentsApplied = false;
@@ -140,6 +141,8 @@ class ImageService
         if ($convertCMYKToRGB && $imagineImage->palette() instanceof CMYK) {
             $imagineImage->usePalette(new RGB());
         }
+
+        $imagineImage->strip();
 
         if ($this->imagineService instanceof Imagine && $originalResource->getFileExtension() === 'gif' && $this->isAnimatedGif(file_get_contents($resourceUri)) === true) {
             $imagineImage->layers()->coalesce();
@@ -226,7 +229,7 @@ class ImageService
         if ($additionalOptions !== []) {
             $defaultOptions = Arrays::arrayMergeRecursiveOverrule($defaultOptions, $additionalOptions);
         }
-        $quality = isset($defaultOptions['quality']) ? (integer)$defaultOptions['quality'] : 90;
+        $quality = isset($defaultOptions['quality']) ? (int)$defaultOptions['quality'] : 90;
         if ($quality < 0 || $quality > 100) {
             throw new InvalidConfigurationException(
                 sprintf('Setting "Neos.Media.image.defaultOptions.quality" allow only value between 0 and 100, current value: %s', $quality),
@@ -310,6 +313,6 @@ class ImageService
     protected function isAnimatedGif($image)
     {
         $count = preg_match_all('#\x00\x21\xF9\x04.{4}\x00(\x2C|\x21)#s', $image, $matches);
-        return $count ? true : false;
+        return (bool)$count;
     }
 }

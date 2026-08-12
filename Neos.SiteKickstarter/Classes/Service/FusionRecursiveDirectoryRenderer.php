@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\SiteKickstarter\Service;
@@ -15,6 +16,9 @@ namespace Neos\SiteKickstarter\Service;
 
 use Neos\Flow\Annotations as Flow;
 
+/**
+ * @internal
+ */
 class FusionRecursiveDirectoryRenderer
 {
     /**
@@ -28,16 +32,18 @@ class FusionRecursiveDirectoryRenderer
      *
      * @param string $srcDirectory
      * @param string $targetDirectory
-     * @param array $variables
+     * @param array<string, string> $variables
      * @throws \Neos\Utility\Exception\FilesException
      */
-    public function renderDirectory(string $srcDirectory, string $targetDirectory, array $variables)
+    public function renderDirectory(string $srcDirectory, string $targetDirectory, array $variables): void
     {
-        $files = scandir($srcDirectory);
+        $files = scandir($srcDirectory) ?: [];
 
         foreach ($files as $key => $value) {
             $path = realpath($srcDirectory . DIRECTORY_SEPARATOR . $value);
-
+            if ($path === false) {
+                throw new \RuntimeException('Could not read directory "' . $srcDirectory . DIRECTORY_SEPARATOR . $value . '".');
+            }
             $targetPath = $targetDirectory . DIRECTORY_SEPARATOR . $value;
 
             if (!is_dir($path)) {

@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Neos\Fusion\Core\ExceptionHandlers;
 
 /*
@@ -37,13 +40,13 @@ class AbsorbingHandler extends AbstractRenderingExceptionHandler
      *
      * @param string $fusionPath path causing the exception
      * @param \Exception $exception exception to handle
-     * @param integer $referenceCode
+     * @param string|null $referenceCode
      * @return string
      */
     protected function handle($fusionPath, \Exception $exception, $referenceCode)
     {
         $this->systemLogger->debug('Absorbed Exception: ' . $exception->getMessage(), ['fusionPath' => $fusionPath, 'referenceCode' => $referenceCode, 'FLOW_LOG_ENVIRONMENT' => ['packageKey' => 'Neos.Fusion', 'className' => self::class, 'methodName' => 'handle']]);
-        $this->throwableStorage->logThrowable($exception);
+        $this->throwableStorage->logThrowable($exception, ['fusionPath' => $fusionPath, 'referenceCode' => $referenceCode]);
         return '';
     }
 

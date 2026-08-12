@@ -3,7 +3,7 @@
 FlowQuery Operation Reference
 =============================
 
-This reference was automatically generated from code on 2023-06-28
+This reference was automatically generated from code on 2026-08-09
 
 
 .. _`FlowQuery Operation Reference: add`:
@@ -24,27 +24,59 @@ or an Object.
 
 
 
-.. _`FlowQuery Operation Reference: cacheLifetime`:
+.. _`FlowQuery Operation Reference: backReferenceNodes`:
 
-cacheLifetime
--------------
+backReferenceNodes
+------------------
 
-"cacheLifetime" operation working on ContentRepository nodes. Will get the minimum of all allowed cache lifetimes for the
-nodes in the current FlowQuery context. This means it will evaluate to the nearest future value of the
-hiddenBeforeDateTime or hiddenAfterDateTime properties of all nodes in the context. If none are set or all values
-are in the past it will evaluate to NULL.
+"backReferenceNodes" operation working on Nodes
 
-To include already hidden nodes (with a hiddenBeforeDateTime value in the future) in the result, also invisible nodes
-have to be included in the context. This can be achieved using the "context" operation before fetching child nodes.
+This operation can be used to find the nodes that are referencing a given node:
 
-Example:
+    ${q(node).backReferenceNodes().get()}
 
-	q(node).context({'invisibleContentShown': true}).children().cacheLifetime()
+A referenceName can be specified as argument
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\CacheLifetimeOperation
-:Priority: 1
-:Final: Yes
-:Returns: integer The cache lifetime in seconds or NULL if either no content collection was given or no child node had a "hiddenBeforeDateTime" or "hiddenAfterDateTime" property set
+    ${q(node).backReferenceNodes("someReferenceName")}
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\BackReferenceNodesOperation
+:Priority: 100
+:Final: No
+:Returns: void
+
+
+
+
+
+.. _`FlowQuery Operation Reference: backReferences`:
+
+backReferences
+--------------
+
+"backReferences" operation working on Nodes
+
+This operation can be used to find incoming references of a given node:
+
+    ${q(node).backReferences().get()}
+
+The result is an array of {@see Reference} instances.
+
+To render the reference name of the first match:
+
+    $q{node).backReferences().get(0).name}
+
+The {@see ReferencePropertyOperation} can be used to access any property on the reference relation:
+
+    ${q(node).backReferences("someReferenceName").property("somePropertyName")}
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\BackReferencesOperation
+:Priority: 100
+:Final: No
+:Returns: void
 
 
 
@@ -59,7 +91,7 @@ children
 context elements and returns all child nodes or only those matching
 the filter expression specified as optional argument.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\ChildrenOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ChildrenOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -96,7 +128,7 @@ closest
 get the first node that matches the selector by testing the node itself and
 traversing up through its ancestors.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\ClosestOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ClosestOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -119,7 +151,18 @@ Example:
 
 	q(node).context({'invisibleContentShown': true}).children()
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\ContextOperation
+Supported options:
+- workspaceName
+- dimensions
+- invisibleContentShown
+
+Unsupported legacy options:
+- currentDateTime
+- targetDimensions
+- removedContentShown
+- inaccessibleContentShown
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ContextOperation
 :Priority: 1
 :Final: No
 :Returns: void
@@ -214,18 +257,18 @@ filter
 
 This filter implementation contains specific behavior for use on ContentRepository
 nodes. It will not evaluate any elements that are not instances of the
-`NodeInterface`.
+`Node`.
 
 The implementation changes the behavior of the `instanceof` operator to
 work on node types instead of PHP object types, so that::
 
-	[instanceof Acme.Com:Page]
+ [instanceof Neos.NodeTypes:Page]
 
 will in fact use `isOfType()` on the `NodeType` of context elements to
 filter. This filter allow also to filter the current context by a given
 node. Anything else remains unchanged.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\FilterOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\FilterOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -242,39 +285,43 @@ find
 "find" operation working on ContentRepository nodes. This operation allows for retrieval
 of nodes specified by a path, identifier or node type (recursive).
 
+Relative examples depending on the node's workspace, dimension space point, visibility constraints and location in the graph:
+
 Example (node name):
 
-	q(node).find('main')
+ q(node).find('main')
 
 Example (relative path):
 
-	q(node).find('main/text1')
-
-Example (absolute path):
-
-	q(node).find('/sites/my-site/home')
-
-Example (identifier):
-
-	q(node).find('#30e893c1-caef-0ca5-b53d-e5699bb8e506')
+ q(node).find('main/text1')
 
 Example (node type):
 
-	q(node).find('[instanceof Acme.Com:Text]')
+ q(node).find('[instanceof Neos.NodeTypes:Text]')
 
 Example (multiple node types):
 
-	q(node).find('[instanceof Acme.Com:Text],[instanceof Acme.Com:Image]')
+ q(node).find('[instanceof Neos.NodeTypes:Text],[instanceof Neos.NodeTypes:Image]')
 
 Example (node type with filter):
 
-	q(node).find('[instanceof Acme.Com:Text][text*="Neos"]')
+ q(node).find('[instanceof Neos.NodeTypes:Text][text*="Neos"]')
+
+Absolute / global examples depending only on the node's workspace and dimension space point as well as visibility constraints:
+
+Example (absolute path):
+
+ q(site).find('/<Neos.Neos:Sites>/my-site/home')
+
+Example (global identifier):
+
+ q(site).find('#30e893c1-caef-0ca5-b53d-e5699bb8e506')
 
 This operation operates rather on the given Context object than on the given node
 and thus may work with the legacy node interface until subgraphs are available
 {@inheritdoc}
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\FindOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\FindOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -328,13 +375,13 @@ returned. If no such index exists, NULL is returned.
 has
 ---
 
-"has" operation working on NodeInterface. Reduce the set of matched elements
+"has" operation working on Node. Reduce the set of matched elements
 to those that have a child node that matches the selector or given subject.
 
 Accepts a selector, an array, an object, a traversable object & a FlowQuery
 object as argument.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\HasOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\HasOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -356,7 +403,7 @@ are given, they are used to filter the context before evaluation.
 :Implementation: Neos\\Eel\\FlowQuery\\Operations\\IsOperation
 :Priority: 1
 :Final: Yes
-:Returns: void|boolean
+:Returns: mixed
 
 
 
@@ -383,10 +430,10 @@ Get the last element inside the context.
 neosUiDefaultNodes
 ------------------
 
-Fetches all nodes needed for the given state of the UI
+
 
 :Implementation: Neos\\Neos\\Ui\\FlowQueryOperations\\NeosUiDefaultNodesOperation
-:Priority: 100
+:Priority: 110
 :Final: No
 :Returns: void
 
@@ -404,7 +451,7 @@ context elements and returns all child nodes or only those matching
 the filter expression specified as optional argument.
 
 :Implementation: Neos\\Neos\\Ui\\FlowQueryOperations\\NeosUiFilteredChildrenOperation
-:Priority: 100
+:Priority: 500
 :Final: No
 :Returns: void
 
@@ -422,7 +469,7 @@ context elements and returns the immediately following sibling.
 If an optional filter expression is provided, it only returns the node
 if it matches the given expression.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\NextOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\NextOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -440,7 +487,7 @@ nextAll
 context elements and returns each following sibling or only those matching
 the filter expression specified as optional argument.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\NextAllOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\NextAllOperation
 :Priority: 0
 :Final: No
 :Returns: void
@@ -459,7 +506,7 @@ and returns each following sibling until the matching sibling is found.
 If an optional filter expression is provided as a second argument,
 it only returns the nodes matching the given expression.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\NextUntilOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\NextUntilOperation
 :Priority: 0
 :Final: No
 :Returns: void
@@ -477,7 +524,7 @@ parent
 context elements and returns each direct parent nodes or only those matching
 the filter expression specified as optional argument.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\ParentOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ParentOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -495,44 +542,7 @@ parents
 context elements and returns the parent nodes or only those matching
 the filter expression specified as optional argument.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\ParentsOperation
-:Priority: 0
-:Final: No
-:Returns: void
-
-
-
-
-
-.. _`FlowQuery Operation Reference: parents`:
-
-parents
--------
-
-"parents" operation working on ContentRepository nodes. It iterates over all
-context elements and returns the parent nodes or only those matching
-the filter expression specified as optional argument.
-
-:Implementation: Neos\\Neos\\Eel\\FlowQueryOperations\\ParentsOperation
-:Priority: 100
-:Final: No
-:Returns: void
-
-
-
-
-
-.. _`FlowQuery Operation Reference: parentsUntil`:
-
-parentsUntil
-------------
-
-"parentsUntil" operation working on ContentRepository nodes. It iterates over all
-context elements and returns the parent nodes until the matching parent is found.
-If an optional filter expression is provided as a second argument,
-it only returns the nodes matching the given expression.
-
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\ParentsUntilOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ParentsOperation
 :Priority: 0
 :Final: No
 :Returns: void
@@ -551,8 +561,8 @@ context elements and returns the parent nodes until the matching parent is found
 If an optional filter expression is provided as a second argument,
 it only returns the nodes matching the given expression.
 
-:Implementation: Neos\\Neos\\Eel\\FlowQueryOperations\\ParentsUntilOperation
-:Priority: 100
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ParentsUntilOperation
+:Priority: 0
 :Final: No
 :Returns: void
 
@@ -570,7 +580,7 @@ context elements and returns the immediately preceding sibling.
 If an optional filter expression is provided, it only returns the node
 if it matches the given expression.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\PrevOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\PrevOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -588,7 +598,7 @@ prevAll
 context elements and returns each preceding sibling or only those matching
 the filter expression specified as optional argument
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\PrevAllOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\PrevAllOperation
 :Priority: 0
 :Final: No
 :Returns: void
@@ -607,7 +617,7 @@ and returns each preceding sibling until the matching sibling is found.
 If an optional filter expression is provided as a second argument,
 it only returns the nodes matching the given expression.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\PrevUntilOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\PrevUntilOperation
 :Priority: 0
 :Final: No
 :Returns: void
@@ -618,18 +628,19 @@ it only returns the nodes matching the given expression.
 
 .. _`FlowQuery Operation Reference: property`:
 
-property
---------
+property (deprecated)
+---------------------
 
-Used to access properties of a ContentRepository Node. If the property mame is
-prefixed with _, internal node properties like start time, end time,
-hidden are accessed.
+Used to access properties of a ContentRepository Node.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\PropertyOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\PropertyOperation
 :Priority: 100
 :Final: Yes
 :Returns: mixed
 
+
+
+**DEPRECATED** with Neos 9.0 for simple case like ${q(node).property(propertyName)} please use ${node.properties.title} or ${node.properties[propertyName]} instead.
 
 
 
@@ -649,6 +660,111 @@ element is returned.
 :Priority: 1
 :Final: Yes
 :Returns: mixed
+
+
+
+
+
+.. _`FlowQuery Operation Reference: referenceNodes`:
+
+referenceNodes
+--------------
+
+"referenceNodes" operation working on Nodes
+
+This operation can be used to find the nodes that are referenced from a given node:
+
+    ${q(node).referenceNodes().get()}
+
+If a referenceName is given as argument only the references for this name are returned
+
+    ${q(node).referenceNodes("someReferenceName").property("title")}
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ReferenceNodesOperation
+:Priority: 100
+:Final: No
+:Returns: void
+
+
+
+
+
+.. _`FlowQuery Operation Reference: referenceProperty`:
+
+referenceProperty
+-----------------
+
+Used to access properties of a ContentRepository Reference
+
+This operation can be used to return the value of a node reference:
+
+    ${q(node).references("someReferenceName").referenceProperty("somePropertyName")}
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ReferencePropertyOperation
+:Priority: 100
+:Final: Yes
+:Returns: mixed
+
+
+
+
+
+.. _`FlowQuery Operation Reference: references`:
+
+references
+----------
+
+"references" operation working on Nodes
+
+This operation can be used to find outgoing references for a given node:
+
+    ${q(node).references().get()}
+
+The result is an array of {@see Reference} instances.
+
+To render the reference name of the first match:
+
+    $q{node).references().get(0).name}
+
+The {@see ReferencePropertyOperation} can be used to access any property on the reference relation:
+
+    ${q(node).references("someReferenceName").property("somePropertyName")}
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\ReferencesOperation
+:Priority: 100
+:Final: No
+:Returns: void
+
+
+
+
+
+.. _`FlowQuery Operation Reference: remove`:
+
+remove
+------
+
+Removes the given Node from the current context.
+
+The operation accepts one argument that may be an Array, a FlowQuery
+or an Object.
+
+!!! This is a Node specific implementation of the generic `remove` operation!!!
+
+The result is an array of {@see Node} instances.
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\RemoveOperation
+:Priority: 100
+:Final: No
+:Returns: void
 
 
 
@@ -677,7 +793,9 @@ or an Object.
 search
 ------
 
+Custom search operation using the Content Graph fulltext search
 
+Original implementation: \Neos\Neos\Ui\FlowQueryOperations\SearchOperation
 
 :Implementation: Neos\\Neos\\Ui\\FlowQueryOperations\\SearchOperation
 :Priority: 100
@@ -697,7 +815,7 @@ siblings
 context elements and returns all sibling nodes or only those matching
 the filter expression specified as optional argument.
 
-:Implementation: Neos\\ContentRepository\\Eel\\FlowQueryOperations\\SiblingsOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\SiblingsOperation
 :Priority: 100
 :Final: No
 :Returns: void
@@ -733,9 +851,7 @@ sort
 "sort" operation working on ContentRepository nodes.
 Sorts nodes by specified node properties.
 
-{@inheritdoc}
-
-First argument is the node property to sort by. Works with internal arguments (_xyz) as well.
+First argument is the node property to sort by.
 Second argument is the sort direction (ASC or DESC).
 Third optional argument are the sort options (see https://www.php.net/manual/en/function.sort):
  - 'SORT_REGULAR'
@@ -745,12 +861,78 @@ Third optional argument are the sort options (see https://www.php.net/manual/en/
  - 'SORT_NATURAL'
  - 'SORT_FLAG_CASE' (use as last option with SORT_STRING, SORT_LOCALE_STRING or SORT_NATURAL)
 A single sort option can be supplied as string. Multiple sort options are supplied as array.
-Other than the above listed sort options throw an error. Omitting the third parameter leaves FlowQuery sort() in SORT_REGULAR sort mode.
+Other than the above listed sort options throw an error.
+Omitting the third parameter leaves FlowQuery sort() in SORT_REGULAR sort mode.
 Example usages:
      sort("title", "ASC", ["SORT_NATURAL", "SORT_FLAG_CASE"])
      sort("risk", "DESC", "SORT_NUMERIC")
 
-:Implementation: Neos\\Neos\\Eel\\FlowQueryOperations\\SortOperation
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\SortOperation
+:Priority: 1
+:Final: No
+:Returns: void
+
+
+
+
+
+.. _`FlowQuery Operation Reference: sortByTimestamp`:
+
+sortByTimestamp
+---------------
+
+"sortByTimestamp" operation working on ContentRepository nodes.
+Sorts nodes by specified timestamp.
+
+First argument is the timestamp to sort by like created, lastModified, originalCreated and originalLastModified
+Second argument is the sort direction (ASC or DESC).
+
+     sortByTimestamp("created", "ASC")
+     sortByTimestamp("lastModified", "DESC")
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\SortByTimestampOperation
+:Priority: 1
+:Final: No
+:Returns: void
+
+
+
+
+
+.. _`FlowQuery Operation Reference: unique`:
+
+unique
+------
+
+"unique" operation working on Nodes
+
+This operation can be used to ensure that nodes are only once in the flow query context
+
+    ${q(node).backReferences().nodes().unique()get()}
+
+The result is an array of {@see Node} instances.
+
+!!! This is a Node specific implementation of the generic `unique` operation!!!
+
+
+
+:Implementation: Neos\\ContentRepository\\NodeAccess\\FlowQueryOperations\\UniqueOperation
+:Priority: 100
+:Final: No
+:Returns: void
+
+
+
+
+
+.. _`FlowQuery Operation Reference: unique`:
+
+unique
+------
+
+Removes duplicate items from the current context.
+
+:Implementation: Neos\\Eel\\FlowQuery\\Operations\\UniqueOperation
 :Priority: 1
 :Final: No
 :Returns: void

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\Model\Adjustment;
@@ -70,7 +71,7 @@ class CropImageAdjustment extends AbstractImageAdjustment
      * @return void
      * @api
      */
-    public function setHeight(int $height = null): void
+    public function setHeight(?int $height = null): void
     {
         $this->height = $height;
         $this->aspectRatioAsString = null;
@@ -94,7 +95,7 @@ class CropImageAdjustment extends AbstractImageAdjustment
      * @return void
      * @api
      */
-    public function setWidth(int $width = null): void
+    public function setWidth(?int $width = null): void
     {
         $this->width = $width;
         $this->aspectRatioAsString = null;
@@ -118,7 +119,7 @@ class CropImageAdjustment extends AbstractImageAdjustment
      * @return void
      * @api
      */
-    public function setX(int $x = null): void
+    public function setX(?int $x = null): void
     {
         $this->x = $x;
         $this->aspectRatioAsString = null;
@@ -142,7 +143,7 @@ class CropImageAdjustment extends AbstractImageAdjustment
      * @return void
      * @api
      */
-    public function setY(int $y = null): void
+    public function setY(?int $y = null): void
     {
         $this->y = $y;
         $this->aspectRatioAsString = null;
@@ -161,10 +162,8 @@ class CropImageAdjustment extends AbstractImageAdjustment
 
     /**
      * This setter accepts strings in order to make configuration / mapping of settings easier.
-     *
-     * @param AspectRatio | string | null $aspectRatio
      */
-    public function setAspectRatio($aspectRatio = null): void
+    public function setAspectRatio(AspectRatio|string|null $aspectRatio = null): void
     {
         if ($aspectRatio === null) {
             $this->aspectRatioAsString = null;

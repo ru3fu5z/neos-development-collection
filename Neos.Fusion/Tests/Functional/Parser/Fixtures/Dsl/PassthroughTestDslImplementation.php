@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Tests\Functional\Parser\Fixtures\Dsl;
 
 /*
@@ -15,7 +16,7 @@ use Neos\Fusion\Core\DslInterface;
 
 class PassthroughTestDslImplementation implements DslInterface
 {
-    public function transpile($code)
+    public function transpile(string $code): string
     {
         return $code;
     }

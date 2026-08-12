@@ -1,0 +1,40 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Neos\ContentRepositoryRegistry\Factory\SubscriptionStore;
+
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Platforms\AbstractMySQLPlatform;
+use Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId;
+use Neos\ContentRepository\Core\Subscription\Store\SubscriptionStoreInterface;
+use Neos\ContentRepository\Dbal\MysqlPlatformContentRepositoryLocker;
+use Neos\ContentRepository\Dbal\SubscriptionStore\DoctrineSubscriptionStore;
+use Psr\Clock\ClockInterface;
+
+/**
+ * @api
+ */
+final readonly class SubscriptionStoreFactory implements SubscriptionStoreFactoryInterface
+{
+    public function __construct(
+        private Connection $connection,
+    ) {
+    }
+
+    /** @param array<string, mixed> $options */
+    public function build(ContentRepositoryId $contentRepositoryId, ClockInterface $clock, array $options): SubscriptionStoreInterface
+    {
+        $contentRepositoryLocker = match (true) {
+            $this->connection->getDatabasePlatform() instanceof AbstractMySQLPlatform => MysqlPlatformContentRepositoryLocker::forContentRepositoryAndConnection($contentRepositoryId, $this->connection),
+            default => null
+        };
+
+        return new DoctrineSubscriptionStore(
+            sprintf('cr_%s_subscriptions', $contentRepositoryId->value),
+            $contentRepositoryLocker,
+            $this->connection,
+            $clock
+        );
+    }
+}

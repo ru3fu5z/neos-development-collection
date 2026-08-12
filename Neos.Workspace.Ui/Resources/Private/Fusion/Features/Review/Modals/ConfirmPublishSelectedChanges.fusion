@@ -1,0 +1,53 @@
+prototype(Neos.Workspace.Ui:Component.Modal.ConfirmPublishSelectedChanges) < prototype(Neos.Fusion:Component) {
+  baseWorkspaceTitle=''
+
+  @private {
+    i18n = ${I18n.id('').source('Main').package('Neos.Workspace.Ui')}
+    popoverId = 'confirm-publish-selected-changes-popover'
+
+    publishSelectedChanges = Neos.Fusion:ActionUri {
+      action = 'publishOrDiscardNodes'
+      format = 'htmx'
+      arguments {
+        workspace = ${workspaceName}
+        action = 'publish'
+      }
+    }
+  }
+
+  renderer = afx`
+    <div popover id={private.popoverId} hx-indicator="#indicator">
+      <header>
+        <Neos.Workspace.Ui:Component.Popover.CloseButton id={private.popoverId}/>
+        <div class="neos-header">
+          {private.i18n.id('workspaces.publishSelectedChangesTo').arguments([props.baseWorkspaceTitle])}
+        </div>
+      </header>
+      <section>
+        <Neos.Workspace.Ui:Component.Button
+          label={private.i18n.id('cancel')}
+          attributes.popovertarget={private.popoverId}
+          attributes.popovertargetaction="close"
+        />
+        <div class="neos-pull-right">
+          <Neos.Workspace.Ui:Component.Button
+            isSuccess
+            autofocus
+            label={private.i18n.id('workspaces.publishChanges')}
+            icon="fas fa-check-double icon-white"
+            attributes.form="publishOrDiscardNodes"
+            attributes.name="moduleArguments[action]"
+            attributes.value="publish"
+            attributes.type="submit"
+            attributes.hx-select='#workspace-module-content'
+            attributes.hx-target='#workspace-module-content'
+            attributes.hx-include="#publishOrDiscardNodesForm"
+            attributes.hx-swap='outerHTML'
+            attributes.hx-on--after-request={'document.getElementById("' + private.popoverId + '").hidePopover()'}
+            attributes.hx-post={private.publishSelectedChanges}
+          />
+        </div>
+      </section>
+    </div>
+  `
+}

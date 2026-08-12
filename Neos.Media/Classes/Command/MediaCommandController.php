@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Command;
@@ -15,7 +16,7 @@ namespace Neos\Media\Command;
 
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Connection;
-use Doctrine\DBAL\DBALException;
+use Doctrine\DBAL\Exception as DBALException;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\EntityManagerInterface;
 use Neos\Flow\Annotations as Flow;
@@ -44,9 +45,7 @@ use Neos\Media\Exception\ThumbnailServiceException;
 use Neos\Utility\Arrays;
 use Neos\Utility\Files;
 
-/**
- * @Flow\Scope("singleton")
- */
+#[Flow\Scope('singleton')]
 class MediaCommandController extends CommandController
 {
     /**
@@ -147,8 +146,7 @@ class MediaCommandController extends CommandController
             WHERE a.persistence_object_identifier IS NULL AND t.persistence_object_identifier IS NULL
         ';
         $statement = $this->dbalConnection->prepare($sql);
-        $statement->execute();
-        $resourceInfos = $statement->fetchAll();
+        $resourceInfos = $statement->execute()->fetchAllAssociative();
 
         if ($resourceInfos === []) {
             !$quiet || $this->outputLine('Found no resources which need to be imported.');
@@ -195,7 +193,7 @@ class MediaCommandController extends CommandController
      * @throws IllegalObjectTypeException
      * @throws AssetServiceException
      */
-    public function removeUnusedCommand(string $assetSource = '', bool $quiet = false, bool $assumeYes = false, string $onlyTags = '', int $limit = null, string $onlyCollections = ''): void
+    public function removeUnusedCommand(string $assetSource = '', bool $quiet = false, bool $assumeYes = false, string $onlyTags = '', ?int $limit = null, string $onlyCollections = ''): void
     {
         $iterator = $this->assetRepository->findAllIterator();
         $assetCount = $this->assetRepository->countAll();
@@ -234,7 +232,7 @@ class MediaCommandController extends CommandController
         !$quiet && $this->output->progressStart($assetCount);
 
         /** @var Asset $asset */
-        foreach ($this->assetRepository->iterate($iterator) as $asset) {
+        foreach ($iterator as $asset) {
             !$quiet && $this->output->progressAdvance(1);
 
             if ($limit !== null && $unusedAssetCount === $limit) {
@@ -318,7 +316,7 @@ class MediaCommandController extends CommandController
      * @return void
      * @throws ThumbnailServiceException
      */
-    public function createThumbnailsCommand(string $preset = null, bool $async = null, bool $quiet = false)
+    public function createThumbnailsCommand(?string $preset = null, ?bool $async = null, bool $quiet = false)
     {
         $async = $async ?? $this->asyncThumbnails;
         $presets = $preset !== null ? [$preset] : array_keys($this->thumbnailService->getPresets());
@@ -329,7 +327,7 @@ class MediaCommandController extends CommandController
         $iterator = $this->assetRepository->findAllIterator();
         $imageCount = $this->assetRepository->countAll();
         !$quiet && $this->output->progressStart($imageCount * count($presetThumbnailConfigurations));
-        foreach ($this->assetRepository->iterate($iterator) as $image) {
+        foreach ($iterator as $image) {
             foreach ($presetThumbnailConfigurations as $presetThumbnailConfiguration) {
                 $this->thumbnailService->getThumbnail($image, $presetThumbnailConfiguration);
                 $this->persistenceManager->persistAll();
@@ -352,7 +350,7 @@ class MediaCommandController extends CommandController
      * @throws IllegalObjectTypeException
      * @throws ThumbnailServiceException
      */
-    public function clearThumbnailsCommand(string $preset = null, bool $quiet = false): void
+    public function clearThumbnailsCommand(?string $preset = null, bool $quiet = false): void
     {
         if ($preset !== null) {
             $thumbnailConfiguration = $this->thumbnailService->getThumbnailConfigurationForPreset($preset);
@@ -365,10 +363,9 @@ class MediaCommandController extends CommandController
         }
 
         !$quiet && $this->output->progressStart($thumbnailCount);
-        foreach ($this->thumbnailRepository->iterate($iterator, function ($iteration) {
-            $this->persistAll($iteration);
-        }) as $thumbnail) {
+        foreach ($iterator as $iteration => $thumbnail) {
             $this->thumbnailRepository->remove($thumbnail);
+            $this->persistAll($iteration);
             !$quiet && $this->output->progressAdvance(1);
         }
         !$quiet && $this->output->progressFinish();
@@ -385,19 +382,18 @@ class MediaCommandController extends CommandController
      * @param bool $quiet If set, only errors will be displayed.
      * @return void
      */
-    public function renderThumbnailsCommand(int $limit = null, bool $quiet = false)
+    public function renderThumbnailsCommand(?int $limit = null, bool $quiet = false)
     {
         $thumbnailCount = $this->thumbnailRepository->countUngenerated();
         $iterator = $this->thumbnailRepository->findUngeneratedIterator();
         !$quiet && $this->output->progressStart($limit !== null && $thumbnailCount > $limit ? $limit : $thumbnailCount);
-        $iteration = 0;
-        foreach ($this->thumbnailRepository->iterate($iterator) as $thumbnail) {
+        foreach ($iterator as $iteration => $thumbnail) {
             if ($thumbnail->getResource() === null) {
                 $this->thumbnailService->refreshThumbnail($thumbnail);
                 $this->persistenceManager->persistAll();
             }
             !$quiet && $this->output->progressAdvance(1);
-            if (++$iteration === $limit) {
+            if ($iteration === $limit) {
                 break;
             }
         }
@@ -472,7 +468,7 @@ class MediaCommandController extends CommandController
      *
      * @throws StopCommandException
      */
-    public function removeVariantsCommand(string $identifier, string $variantName, bool $quiet = false, bool $assumeYes = false, int $limit = null)
+    public function removeVariantsCommand(string $identifier, string $variantName, bool $quiet = false, bool $assumeYes = false, ?int $limit = null)
     {
         $variantsToRemove = $this->imageVariantRepository->findVariantsByIdentifierAndVariantName($identifier, $variantName, $limit);
         if (empty($variantsToRemove)) {
@@ -536,7 +532,7 @@ class MediaCommandController extends CommandController
      * @throws AssetVariantGeneratorException
      * @throws IllegalObjectTypeException
      */
-    public function renderVariantsCommand(int $limit = null, bool $quiet = false, bool $recreate = false): void
+    public function renderVariantsCommand(?int $limit = null, bool $quiet = false, bool $recreate = false): void
     {
         $resultMessage = null;
         $generatedVariants = 0;

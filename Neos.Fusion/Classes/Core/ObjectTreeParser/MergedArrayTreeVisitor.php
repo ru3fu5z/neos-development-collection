@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser;
@@ -13,32 +14,33 @@ namespace Neos\Fusion\Core\ObjectTreeParser;
  * source code.
  */
 
+use Neos\Fusion;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\AssignedObjectPath;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\Block;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\BoolValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\DslExpressionValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\EelExpressionValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\FloatValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionFile;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionObjectValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\IncludeStatement;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\IntValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\MetaPathSegment;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectStatement;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\NullValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectPath;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectStatement;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\PathSegment;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\PrototypePathSegment;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\FloatValue;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\IntValue;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\BoolValue;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\NullValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\StatementList;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\StringValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueAssignment;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueCopy;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueUnset;
-use Neos\Fusion;
 use Neos\Fusion\Core\ObjectTreeParser\Exception\ParserException;
 
 /**
  * Builds the merged array tree for the Fusion runtime
+ * @internal
  */
 class MergedArrayTreeVisitor implements AstNodeVisitorInterface
 {
@@ -108,7 +110,7 @@ class MergedArrayTreeVisitor implements AstNodeVisitorInterface
         $this->isInsidePrototypeDeclaration = $wasPreviouslyInPrototypeDeclaration;
     }
 
-    public function visitBlock(Block $block, array $currentPath = null)
+    public function visitBlock(Block $block, ?array $currentPath = null)
     {
         $currentPath ?? throw new \BadMethodCallException('$currentPath is required.');
 
@@ -151,7 +153,7 @@ class MergedArrayTreeVisitor implements AstNodeVisitorInterface
         return [$key];
     }
 
-    public function visitValueAssignment(ValueAssignment $valueAssignment, array $currentPath = null)
+    public function visitValueAssignment(ValueAssignment $valueAssignment, ?array $currentPath = null)
     {
         $currentPath ?? throw new \BadMethodCallException('$currentPath is required.');
 
@@ -214,7 +216,7 @@ class MergedArrayTreeVisitor implements AstNodeVisitorInterface
         return $stringValue->value;
     }
 
-    public function visitValueCopy(ValueCopy $valueCopy, array $currentPath = null)
+    public function visitValueCopy(ValueCopy $valueCopy, ?array $currentPath = null)
     {
         $currentPath ?? throw new \BadMethodCallException('$currentPath is required.');
 
@@ -254,7 +256,7 @@ class MergedArrayTreeVisitor implements AstNodeVisitorInterface
         $this->mergedArrayTree->copyValueInTree($currentPath, $sourcePath);
     }
 
-    public function visitAssignedObjectPath(AssignedObjectPath $assignedObjectPath, $relativePath = [])
+    public function visitAssignedObjectPath(AssignedObjectPath $assignedObjectPath, array $relativePath = [])
     {
         $path = [];
         if ($assignedObjectPath->isRelative) {
@@ -263,7 +265,7 @@ class MergedArrayTreeVisitor implements AstNodeVisitorInterface
         return $assignedObjectPath->objectPath->visit($this, $path);
     }
 
-    public function visitValueUnset(ValueUnset $valueUnset, array $currentPath = null)
+    public function visitValueUnset(ValueUnset $valueUnset, ?array $currentPath = null)
     {
         $currentPath ?? throw new \BadMethodCallException('$currentPath is required.');
 
@@ -305,7 +307,7 @@ class MergedArrayTreeVisitor implements AstNodeVisitorInterface
         if ($this->contextPathAndFilename === null) {
             $fusionCode = '';
         } else {
-            $fusionCode = file_get_contents($this->contextPathAndFilename);
+            $fusionCode = file_get_contents($this->contextPathAndFilename) ?: '';
         }
         return $parserException
             ->setHideColumnInformation()

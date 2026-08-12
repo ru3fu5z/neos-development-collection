@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Neos\Tests\Functional\Service;
 
 /*
@@ -11,6 +12,8 @@ namespace Neos\Neos\Tests\Functional\Service;
  * source code.
  */
 
+use Neos\ContentRepository\Core\NodeType\NodeTypeManager;
+use Neos\Flow\Configuration\ConfigurationManager;
 use Neos\Flow\Tests\FunctionalTestCase;
 use Neos\Neos\Service\NodeTypeSchemaBuilder;
 
@@ -34,7 +37,12 @@ class NodeTypeSchemaBuilderTest extends FunctionalTestCase
     public function setUp(): void
     {
         parent::setUp();
-        $this->nodeTypeSchemaBuilder = $this->objectManager->get(NodeTypeSchemaBuilder::class);
+        $configurationManager = $this->objectManager->get(ConfigurationManager::class);
+        $this->nodeTypeSchemaBuilder = NodeTypeSchemaBuilder::create(
+            NodeTypeManager::createFromArrayConfigurationLoader(
+                fn () => $configurationManager->getConfiguration('NodeTypes')
+            )
+        );
         $this->schema = $this->nodeTypeSchemaBuilder->generateNodeTypeSchema();
     }
 

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\FusionObjects;
@@ -28,8 +29,6 @@ use Neos\Flow\Mvc\Routing\UriBuilder;
  *  * format
  *  * section
  *  * additionalParams
- *  * addQueryString
- *  * argumentsToBeExcludedFromQueryString
  *  * absolute
  *  * request
  *
@@ -93,7 +92,7 @@ class ActionUriImplementation extends AbstractFusionObject
     public function getArguments(): ?array
     {
         $arguments = $this->fusionValue('arguments');
-        return is_array($arguments) ? $arguments: [];
+        return is_array($arguments) ? $arguments : [];
     }
 
     /**
@@ -127,33 +126,13 @@ class ActionUriImplementation extends AbstractFusionObject
     }
 
     /**
-     * Arguments to be removed from the URI. Only active if addQueryString = true
-     *
-     * @return array|null
-     */
-    public function getArgumentsToBeExcludedFromQueryString(): ?array
-    {
-        return $this->fusionValue('argumentsToBeExcludedFromQueryString');
-    }
-
-    /**
-     * If true, the current query parameters will be kept in the URI
-     *
-     * @return boolean
-     */
-    public function isAddQueryString(): bool
-    {
-        return (boolean)$this->fusionValue('addQueryString');
-    }
-
-    /**
      * If true, an absolute URI is rendered
      *
      * @return boolean
      */
     public function isAbsolute(): bool
     {
-        return (boolean)$this->fusionValue('absolute');
+        return (bool)$this->fusionValue('absolute');
     }
 
     /**
@@ -174,11 +153,6 @@ class ActionUriImplementation extends AbstractFusionObject
             $uriBuilder->setArguments($additionalParams);
         }
 
-        $argumentsToBeExcludedFromQueryString = $this->getArgumentsToBeExcludedFromQueryString();
-        if ($argumentsToBeExcludedFromQueryString !== null) {
-            $uriBuilder->setArgumentsToBeExcludedFromQueryString($argumentsToBeExcludedFromQueryString);
-        }
-
         $absolute = $this->isAbsolute();
         if ($absolute === true) {
             $uriBuilder->setCreateAbsoluteUri(true);
@@ -187,11 +161,6 @@ class ActionUriImplementation extends AbstractFusionObject
         $section = $this->getSection();
         if ($section !== null) {
             $uriBuilder->setSection($section);
-        }
-
-        $addQueryString = $this->isAddQueryString();
-        if ($addQueryString === true) {
-            $uriBuilder->setAddQueryString(true);
         }
 
         try {

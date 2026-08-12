@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Domain\Repository;
 
 /*
@@ -14,9 +15,7 @@ namespace Neos\Media\Domain\Repository;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Persistence\Repository;
 
-/**
- * @Flow\Scope("singleton")
- */
+#[Flow\Scope('singleton')]
 final class ImportedAssetRepository extends Repository
 {
     /**

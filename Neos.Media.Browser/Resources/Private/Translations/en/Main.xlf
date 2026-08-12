@@ -101,6 +101,9 @@
 			<trans-unit id="message.operationCannotBeUndone" xml:space="preserve">
 				<source>This operation cannot be undone.</source>
 			</trans-unit>
+			<trans-unit id="message.assetContainsMaliciousContent" xml:space="preserve">
+				<source>This asset might contain malicious content!</source>
+			</trans-unit>
 			<trans-unit id="cancel" xml:space="preserve">
 				<source>Cancel</source>
 			</trans-unit>
@@ -426,6 +429,15 @@
 			</trans-unit>
 			<trans-unit id="missingDocumentNode" xml:space="preserve">
 				<source>No document node found for this node</source>
+			</trans-unit>
+			<trans-unit id="createMissingVariants" xml:space="preserve">
+				<source>Create missing variants</source>
+			</trans-unit>
+      <trans-unit id="assetImport.importInfo" xml:space="preserve">
+				<source>Asset is being imported. Please wait.</source>
+			</trans-unit>
+      <trans-unit id="assetImport.importInProcess" xml:space="preserve">
+				<source>Import still in process. Please wait.</source>
 			</trans-unit>
 		</body>
 	</file>

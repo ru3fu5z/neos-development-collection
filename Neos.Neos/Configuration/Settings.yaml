@@ -11,6 +11,7 @@
 Neos:
 
   Neos:
+
     fusion:
       # if set to true, Fusion is cached on a per-site basis.
       # Depending on the size of your Fusion, will improve rendering times 20-100+ ms.
@@ -50,11 +51,6 @@ Neos:
       More information and contribution opportunities at https://www.neos.io
       -->
 
-    routing:
-      # Setting this to true allows to use an empty uriSegment for default dimensions.
-      # The only limitation is that all segments must be unique across all dimenions.
-      supportEmptySegmentForDimensions: true
-
     nodeTypes:
       groups:
         general:
@@ -69,6 +65,10 @@ Neos:
           position: 200
           label: 'Neos.Neos:Main:nodeTypes.groups.plugins'
           collapsed: true
+
+    frontend:
+      # HTTP Status Code used for redirecting Neos.Neos:Shortcut to target
+      shortcutRedirectHttpStatusCode: 303
 
     userInterface:
 
@@ -155,7 +155,7 @@ Neos:
               placeholder: Choose
             defaultValue: {  }
           Neos\Media\Domain\Model\ImageInterface:
-            typeConverter: Neos\Media\TypeConverter\ImageInterfaceJsonSerializer
+            typeConverter: Neos\Media\TypeConverter\ImageInterfaceArrayPresenter
             editor: Neos.Neos/Inspector/Editors/ImageEditor
             editorOptions:
               # With this option you can limit the maximum file size to the specified number of bytes.
@@ -201,6 +201,33 @@ Neos:
               features:
                 upload: true
                 mediaBrowser: true
+          Neos\Media\Domain\Model\Audio:
+            typeConverter: Neos\Neos\TypeConverter\EntityToIdentityConverter
+            editor: Neos.Neos/Inspector/Editors/AssetEditor
+            editorOptions:
+              features:
+                upload: true
+                mediaBrowser: true
+              constraints:
+                mediaTypes:
+                  - 'audio/*'
+          Neos\Media\Domain\Model\Document:
+            typeConverter: Neos\Neos\TypeConverter\EntityToIdentityConverter
+            editor: Neos.Neos/Inspector/Editors/AssetEditor
+            editorOptions:
+              features:
+                upload: true
+                mediaBrowser: true
+          Neos\Media\Domain\Model\Video:
+            typeConverter: Neos\Neos\TypeConverter\EntityToIdentityConverter
+            editor: Neos.Neos/Inspector/Editors/AssetEditor
+            editorOptions:
+              features:
+                upload: true
+                mediaBrowser: true
+              constraints:
+                mediaTypes:
+                  - 'video/*'
           array<Neos\Media\Domain\Model\Asset>:
             typeConverter: Neos\Flow\Property\TypeConverter\TypedArrayConverter
             editor: Neos.Neos/Inspector/Editors/AssetEditor
@@ -214,11 +241,11 @@ Neos:
             editor: Neos.Neos/Inspector/Editors/DateTimeEditor
             editorOptions:
               format: d-m-Y
+          # special types uses for NodeType references to wire the "editor"
+          # singular "reference" will be used if constraints.maxItems is set to 1
           reference:
-            typeConverter: Neos\Neos\Service\Mapping\NodeReferenceConverter
             editor: Neos.Neos/Inspector/Editors/ReferenceEditor
           references:
-            typeConverter: Neos\Neos\Service\Mapping\NodeReferenceConverter
             editor: Neos.Neos/Inspector/Editors/ReferencesEditor
         editors:
           Neos.Neos/Inspector/Editors/CodeEditor:
@@ -259,12 +286,8 @@ Neos:
 
       defaultEditPreviewMode: inPlace
       editPreviewModes:
-        # Live mode is only configured here for consistency. You shouldn't change it.
-        live:
-          isEditingMode: false
-          isPreviewMode: false
-          fusionRenderingPath: ''
-          title: Live
+        # the system integrated rendering mode "frontend" cannot be configured
+        # frontend: {}
         inPlace:
           isEditingMode: true
           isPreviewMode: false
@@ -286,6 +309,7 @@ Neos:
 
       backendLoginForm:
         backgroundImage: 'resource://Neos.Neos/Public/Images/Login/Wallpaper.webp'
+        backgroundImageAttribution: 'Login background photo of a Seagull, Cap de ses Salines by Lukas Neugebauer.'
         logoImage: 'resource://Neos.Neos/Public/Images/Login/Logo.svg'
         stylesheets:
           'Neos.Neos:DefaultStyles': 'resource://Neos.Neos/Public/Styles/Login.css'
@@ -313,19 +337,6 @@ Neos:
         description: 'Neos.Neos:Modules:management.description'
         icon: fas fa-briefcase
         mainStylesheet: 'Lite'
-        submodules:
-          workspaces:
-            label: 'Neos.Neos:Modules:workspaces.label'
-            controller: 'Neos\Neos\Controller\Module\Management\WorkspacesController'
-            description: 'Neos.Neos:Modules:workspaces.description'
-            icon: fas fa-th-large
-            mainStylesheet: 'Lite'
-          history:
-            label: 'Neos.Neos:Modules:history.label'
-            controller: 'Neos\Neos\Controller\Module\Management\HistoryController'
-            description: 'Neos.Neos:Modules:history.description'
-            icon: fas fa-calendar-alt
-            mainStylesheet: 'Lite'
       administration:
         label: 'Neos.Neos:Modules:administration.label'
         controller: 'Neos\Neos\Controller\Module\AdministrationController'
@@ -343,6 +354,9 @@ Neos:
               new:
                 label: 'Neos.Neos:Modules:users.actions.new.label'
                 title: 'Neos.Neos:Modules:users.actions.new.title'
+            settings:
+              pagination:
+                itemsPerPage: 10
           packages:
             label: 'Neos.Neos:Modules:packages.label'
             controller: 'Neos\Neos\Controller\Module\Administration\PackagesController'
@@ -386,18 +400,6 @@ Neos:
             icon: fas fa-user
             mainStylesheet: 'Lite'
 
-     # Settings for the Neos Event Log (** DO NOT USE, NO PUBLIC API YET **)
-    eventLog:
-      enabled: false
-      monitorEntities:
-        Neos\Flow\Security\Account:
-          events:
-            created: Account.Created
-            deleted: Account.Deleted
-          data:
-            accountIdentifier: '${entity.accountIdentifier}'
-            authenticationProviderName: '${entity.authenticationProviderName}'
-            name: '${entity.party.name.fullName}'
     transliterationRules:
       da:
         Å: Aa
@@ -412,6 +414,20 @@ Neos:
         ö: oe
         ü: ue
 
+    # Configures defaults for node label generation
+    labelGenerator:
+      eel:
+        defaultContext:
+          String: Neos\Eel\Helper\StringHelper
+          Array: Neos\Eel\Helper\ArrayHelper
+          Date: Neos\Eel\Helper\DateHelper
+          Configuration: Neos\Eel\Helper\ConfigurationHelper
+          Math: Neos\Eel\Helper\MathHelper
+          Json: Neos\Eel\Helper\JsonHelper
+          I18n: Neos\Flow\I18n\EelHelper\TranslationHelper
+          q: Neos\Eel\FlowQuery\FlowQuery::q
+          Neos.Node: Neos\Neos\Fusion\Helper\NodeHelper
+
   Flow:
     aop:
       globalObjects:
@@ -423,16 +439,12 @@ Neos:
 
     http:
       middlewares:
-        'requestUriHostParameter':
+        'detectSite':
           position: 'before routing'
-          middleware: 'Neos\Neos\Routing\RequestUriHostMiddleware'
-
+          middleware: 'Neos\Neos\FrontendRouting\SiteDetection\SiteDetectionMiddleware'
     mvc:
       routes:
-        'Neos.Neos':
-          variables:
-            # Set this to an empty string if you prefer URLs without the ".html" suffix
-            'defaultUriSuffix': '.html'
+        'Neos.Neos': true
         # Move Neos.Media routes before default Neos routes so that they have priority
         'Neos.Media':
           position: 'before Neos.Neos'
@@ -464,18 +476,6 @@ Neos:
     session:
       name: Neos_Session
 
-    persistence:
-      doctrine:
-        eventListeners:
-          Neos\Neos\EventLog\Integrations\EntityIntegrationService:
-            events:
-              - onFlush
-            listener: Neos\Neos\EventLog\Integrations\EntityIntegrationService
-          Neos\Neos\EventLog\Integrations\ContentRepositoryIntegrationService:
-            events:
-              - preFlush
-            listener: Neos\Neos\EventLog\Integrations\ContentRepositoryIntegrationService
-
     error:
       exceptionHandler:
         renderingGroups:
@@ -493,15 +493,13 @@ Neos:
               - Neos\Flow\Persistence\Doctrine\Exception\DatabaseException
               - Neos\Flow\Persistence\Doctrine\Exception\DatabaseConnectionException
               - Neos\Flow\Persistence\Doctrine\Exception\DatabaseStructureException
-            options: &welcomeTemplate
-              viewClassName: Neos\FluidAdaptor\View\StandaloneView
+            options:
+              viewClassName: Neos\Fusion\View\FusionView
               viewOptions:
-                templatePathAndFilename: 'resource://Neos.Neos/Private/Templates/Error/Welcome.html'
-                layoutRootPaths: ['resource://Neos.Neos/Private/Layouts/']
-          noHomepageException:
-            matchingExceptionClassNames:
-              - Neos\Neos\Routing\Exception\NoHomepageException
-            options: *welcomeTemplate
+                fusionPath: 'Neos/Fusion/DatabaseConnectionExceptions'
+                fusionPathPatterns: ['resource://Neos.Neos/Private/Fusion/Error/Root.fusion']
+                enableContentCache: false
+                templatePathAndFilename: ~
       debugger:
         ignoredClasses:
           Neos\\Neos\\Domain\\Service\\ContentContextFactory: true
@@ -511,46 +509,14 @@ Neos:
         neos-site: Sites
         neos-plugin: Plugins
 
-  ContentRepository:
-    # This instructs neos to fallback to the given type if a node type can't be found (because it was removed or has
-    # been renamed for example). The default "Neos.Neos:FallbackNode" renders a warning in backend and is ignored
-    # in frontend rendering
-    fallbackNodeType: 'Neos.Neos:FallbackNode'
-
-    # Definition of available content dimensions. Additional content dimensions may be defined in third-party packages
-    # or via global settings.
-    #
-    #contentDimensions:
-    #
-    #  # Content dimension "language" serves for translation of content into different languages. Its value specifies
-    #  # the language or language variant by means of a locale.
-    #  'language':
-    #    # The default dimension that is applied when creating nodes without specifying a dimension
-    #    default: 'mul_ZZ'
-    #    # The default preset to use if no URI segment was given when resolving languages in the router
-    #    defaultPreset: 'all'
-    #    label: 'Language'
-    #    icon: 'icon-language'
-    #    presets:
-    #      'all':
-    #        label: 'All languages'
-    #        values: ['mul_ZZ']
-    #        uriSegment: 'all'
-    #      # Example for additional languages:
-    #
-    #      'en_GB':
-    #        label: 'English (Great Britain)'
-    #        values: ['en_GB', 'en_ZZ', 'mul_ZZ']
-    #        uriSegment: 'gb'
-    #      'de':
-    #        label: 'German (Germany)'
-    #        values: ['de_DE', 'de_ZZ', 'mul_ZZ']
-    #        uriSegment: 'de'
-
-    labelGenerator:
-      eel:
-        defaultContext:
-          Neos.Node: Neos\Neos\Fusion\Helper\NodeHelper
+    persistence:
+      doctrine:
+        migrations:
+          ignoredTables:
+            'neos_asset_usage': true
+            'neos_neos_workspace_metadata': true
+            'neos_neos_workspace_role': true
+            'neos_neos_impending_hard_removal_conflict': true
 
   Fusion:
     rendering:
@@ -559,208 +525,7 @@ Neos:
       Neos.Node: Neos\Neos\Fusion\Helper\NodeHelper
       Neos.Link: Neos\Neos\Fusion\Helper\LinkHelper
       Neos.Array: Neos\Neos\Fusion\Helper\ArrayHelper
-      Neos.Rendering: Neos\Neos\Fusion\Helper\RenderingHelper
       Neos.Caching: Neos\Neos\Fusion\Helper\CachingHelper
+      Neos.Dimension: Neos\Neos\Fusion\Helper\DimensionHelper
       Neos.Backend: Neos\Neos\Fusion\Helper\BackendHelper
-
-  # DocTools is a tool used by Neos Developers to help with a variety of documentation tasks.
-  # These settings are only used in generating Documentation.
-  DocTools:
-    collections:
-      Neos:
-        commandReferences:
-          'Neos:NeosCommands': true
-        references:
-          'TYPO3Fluid:ViewHelpers': true
-          'Neos:FluidAdaptorViewHelpers': true
-          'Neos:MediaViewHelpers': true
-          'Neos:FormViewHelpers': true
-          'Neos:NeosViewHelpers': true
-          'Neos:ContentRepositoryViewHelpers': true
-          'Neos:FusionViewHelpers': true
-          'Neos:FlowValidators': true
-          'Neos:PartyValidators': true
-          'Neos:MediaValidators': true
-          'Neos:FlowSignals': true
-          'Neos:NeosSignals': true
-          'Neos:MediaSignals': true
-          'Neos:ContentRepositorySignals': true
-          'Neos:FlowQueryOperations': true
-          'Neos:EelHelpers': true
-    commandReferences:
-      'Neos:NeosCommands':
-        title: 'Neos Command Reference'
-        packageKeys:
-          'Neos.Flow': true
-          'Neos.Party': true
-          'Neos.FluidAdaptor': true
-          'Neos.Kickstarter': true
-          'Neos.Welcome': true
-          'Neos.Media': true
-          'Neos.ContentRepository': true
-          'Neos.SiteKickstarter': true
-          'Neos.Neos': true
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/CommandReference.rst'
-    references:
-      'TYPO3Fluid:ViewHelpers':
-        title: 'TYPO3 Fluid ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/TYPO3Fluid.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: TYPO3Fluid\Fluid\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^TYPO3Fluid\\Fluid\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              f: TYPO3Fluid\Fluid\ViewHelpers
-      'Neos:FluidAdaptorViewHelpers':
-        title: 'FluidAdaptor ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/FluidAdaptor.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^Neos\\FluidAdaptor\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              f: Neos\FluidAdaptor\ViewHelpers
-      'Neos:MediaViewHelpers':
-        title: 'Media ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/Media.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^Neos\\Media\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              neos.media: Neos\Media\ViewHelpers
-      'Neos:FormViewHelpers':
-        title: 'Form ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/Form.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^Neos\\Form\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              neos.form: Neos\Form\ViewHelpers
-      'Neos:NeosViewHelpers':
-        title: 'Neos ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/Neos.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^Neos\\Neos\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              f: Neos\FluidAdaptor\ViewHelpers
-              neos: Neos\Neos\ViewHelpers
-      'Neos:ContentRepositoryViewHelpers':
-        title: 'Content Repository ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/ContentRepository.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^Neos\\ContentRepository\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              f: Neos\FluidAdaptor\ViewHelpers
-              neos: Neos\Neos\ViewHelpers
-      'Neos:FusionViewHelpers':
-        title: 'Fusion ViewHelper Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/ViewHelpers/Fusion.rst'
-        templatePathAndFilename: 'resource://Neos.DocTools/Private/Templates/ViewHelperReferenceTemplate.txt'
-        affectedClasses:
-          parentClassName: Neos\FluidAdaptor\Core\ViewHelper\AbstractViewHelper
-          classNamePattern: '/^Neos\\Fusion\\ViewHelpers\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FluidViewHelperClassParser
-          options:
-            namespaces:
-              f: Neos\FluidAdaptor\ViewHelpers
-              fusion: Neos\Fusion\ViewHelpers
-      'Neos:FlowValidators':
-        title: 'Flow Validator Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Validators/Flow.rst'
-        affectedClasses:
-          parentClassName: Neos\Flow\Validation\Validator\AbstractValidator
-          classNamePattern: '/^Neos\\Flow\\Validation\\Validator\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FlowValidatorClassParser
-      'Neos:PartyValidators':
-        title: 'Party Validator Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Validators/Party.rst'
-        affectedClasses:
-          parentClassName: Neos\Flow\Validation\Validator\AbstractValidator
-          classNamePattern: '/^Neos\\Party\\Validation\\Validator\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FlowValidatorClassParser
-      'Neos:MediaValidators':
-        title: 'Media Validator Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Validators/Media.rst'
-        affectedClasses:
-          parentClassName: Neos\Flow\Validation\Validator\AbstractValidator
-          classNamePattern: '/^Neos\\Media\\Validator\\.*$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FlowValidatorClassParser
-      'Neos:FlowSignals':
-        title: 'Flow Signals Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Signals/Flow.rst'
-        affectedClasses:
-          classesContainingMethodsAnnotatedWith: Neos\Flow\Annotations\Signal
-          classNamePattern: '/^Neos\\Flow\\.*$/i'
-          includeAbstractClasses: true
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\SignalsParser
-      'Neos:NeosSignals':
-        title: 'Neos Signals Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Signals/Neos.rst'
-        affectedClasses:
-          classesContainingMethodsAnnotatedWith: Neos\Flow\Annotations\Signal
-          classNamePattern: '/^Neos\\Neos\\.*$/i'
-          includeAbstractClasses: true
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\SignalsParser
-      'Neos:MediaSignals':
-        title: 'Media Signals Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Signals/Media.rst'
-        affectedClasses:
-          classesContainingMethodsAnnotatedWith: Neos\Flow\Annotations\Signal
-          classNamePattern: '/^Neos\\Media\\.*$/i'
-          includeAbstractClasses: true
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\SignalsParser
-      'Neos:ContentRepositorySignals':
-        title: 'Content Repository Signals Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/Signals/ContentRepository.rst'
-        affectedClasses:
-          classesContainingMethodsAnnotatedWith: Neos\Flow\Annotations\Signal
-          classNamePattern: '/^Neos\\ContentRepository\\.*$/i'
-          includeAbstractClasses: true
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\SignalsParser
-      'Neos:FlowQueryOperations':
-        title: 'FlowQuery Operation Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/FlowQueryOperationReference.rst'
-        affectedClasses:
-          interface: Neos\Eel\FlowQuery\OperationInterface
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\FlowQueryOperationClassParser
-      'Neos:EelHelpers':
-        title: 'Eel Helpers Reference'
-        savePathAndFilename: '%FLOW_PATH_PACKAGES%Neos/Neos.Neos/Documentation/References/EelHelpersReference.rst'
-        affectedClasses:
-          interface: Neos\Eel\ProtectedContextAwareInterface
-          classNamePattern: '/^.*Helper$/i'
-        parser:
-          implementationClassName: Neos\DocTools\Domain\Service\EelHelperClassParser
+      Neos.Site: Neos\Neos\Fusion\Helper\SiteHelper

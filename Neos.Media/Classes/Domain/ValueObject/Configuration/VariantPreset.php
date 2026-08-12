@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\ValueObject\Configuration;
@@ -45,9 +46,9 @@ final class VariantPreset
      * @param array $configuration
      * @return VariantPreset
      */
-    public static function fromConfiguration(array $configuration): VariantPreset
+    public static function fromConfiguration(array $configuration): self
     {
-        $variantPreset = new static(
+        $variantPreset = new self(
             new Label($configuration['label'])
         );
         if (!isset($configuration['mediaTypePatterns'])) {

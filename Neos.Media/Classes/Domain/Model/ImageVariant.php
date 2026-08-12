@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Domain\Model;
 
 /*
@@ -17,6 +18,7 @@ use Doctrine\Common\Collections\Criteria;
 use Doctrine\ORM\Mapping as ORM;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Configuration\Exception\InvalidConfigurationException;
+use Neos\Flow\ObjectManagement\DependencyInjection\DependencyProxy;
 use Neos\Flow\ObjectManagement\ObjectManagerInterface;
 use Neos\Flow\ResourceManagement\Exception;
 use Neos\Flow\ResourceManagement\PersistentResource;
@@ -94,6 +96,12 @@ class ImageVariant extends Asset implements AssetVariantInterface, ImageInterfac
         } catch (\Exception $e) {
             // This won't happen, because we create DateTime without any parameters.
         }
+
+        $originalAssetCollections = $originalAsset->getAssetCollections();
+        if ($originalAssetCollections instanceof DependencyProxy) {
+            $originalAssetCollections->_activateDependency();
+        }
+        $this->setAssetCollections($originalAssetCollections);
     }
 
     /**

@@ -3,7 +3,7 @@
 NodeType Definition Reference
 =============================
 
-THe manual to understand NodeType definitions can be found in the Neos Docs (https://docs.neos.io/cms/manual/content-repository/nodetype-definition).
+The manual to understand NodeType definitions can be found in the Neos Docs (https://docs.neos.io/cms/manual/content-repository/nodetype-definition).
 
 The following options are allowed for defining a NodeType:
 
@@ -13,16 +13,6 @@ The following options are allowed for defining a NodeType:
 
   Abstract node types are useful when using inheritance and composition, so mark base node types and
   mixins as abstract.
-
-``aggregate``
-  A boolean flag, marking a node type as *aggregate*. If a node type is marked as aggregate, it means that:
-
-  - the node type can "live on its own", i.e. can be part of an external URL
-  - when moving this node, all node variants are also moved (across all dimensions)
-  - Recursive copying only happens *inside* this aggregate, and stops at nested aggregates.
-
-  The most prominent *aggregate* is `Neos.Neos:Document` and everything which inherits from it, like
-  `Neos.NodeTypes:Page`.
 
 ``superTypes``
   An array of parent node types as keys with a boolean value::
@@ -55,7 +45,7 @@ The following options are allowed for defining a NodeType:
   Here is an example::
 
     childNodes:
-      someChild:
+      'some-child':
         type: 'Neos.Neos:ContentCollection'
         constraints:
           nodeTypes:
@@ -68,11 +58,11 @@ The following options are allowed for defining a NodeType:
 
     'Neos.NodeTypes:Page':
       childNodes:
-        'someChild':
+        'some-child':
           type: 'Neos.Neos:ContentCollection'
           position: 'before main'
 
-  This adds a new ContentCollection called someChild to the default page.
+  This adds a new ContentCollection called ``some-child`` to the default page.
   It will be positioned before the main ContentCollection that the default page has.
   The position setting follows the same sorting logic used in Fusion
   (see the :ref:`neos-fusion-reference`).
@@ -93,7 +83,7 @@ The following options are allowed for defining a NodeType:
 
   ``generatorClass``
     Alternatively the class of a node label generator implementing
-    ``Neos\ContentRepository\Domain\Model\NodeLabelGeneratorInterface`` can be specified as a nested option.
+    ``Neos\Neos\Domain\NodeLabel\NodeLabelGeneratorInterface`` can be specified as a nested option.
 
 ``options``
   Options for third party-code, the Content-Repository ignores those options but Neos or Packages may use this to adjust
@@ -110,7 +100,7 @@ The following options are allowed for defining a NodeType:
 
       If ``options.fusion.prototypeGenerator`` is set to ``null`` no prototype is created for this type.
 
-      By default Neos has generators for all nodes of type ``Neos.Neos:Node`` and creates protoypes based on
+      By default Neos has generators for all nodes of type ``Neos.Neos:Node`` and creates prototypes based on
       ``Neos.Fusion:Template``. A template path is assumed based on the package-prefix and the nodetype-name. All properties
       of the node are passed to the template. For the nodeTypes of type ``Neos.Neos:Document``, ``Neos.Neos:Content`` and
       ``Neos.Neos:Plugin`` the corresponding prototype is used as base-prototype.
@@ -152,7 +142,7 @@ The following options are allowed for defining a NodeType:
 
     Fontawesome icon:
     All free Fontawesome 5 icons can be used:
-    https://fontawesome.com/icons?d=gallery&m=free
+    https://fontawesome.com/v5/search?o=r&m=free
 
     Those can be referenced via "icon-[name]", as the UI includes a fallback to the "fas"
     prefix-classes. To be sure which icon will be used, they can also be referenced by their
@@ -251,7 +241,7 @@ The following options are allowed for defining a NodeType:
         The human-readable label for this view
 
       ``group``
-        Identifier of the *inspector group* this view is categorized into in the content editing user interface. If none is given, the view is not visibile in the property inspector of the user interface.
+        Identifier of the *inspector group* this view is categorized into in the content editing user interface. If none is given, the view is not visible in the property inspector of the user interface.
 
         The value here must reference a group configured in the ``ui.inspector.groups`` element of the node type this view belongs to.
 
@@ -324,7 +314,20 @@ The following options are allowed for defining a NodeType:
           key would create soft line breaks instead (equivalent to configuring an editable on a span tag).
 
         ``linking``
-          A way to configure additional options available for a link, e.g. target or rel attributes.
+          Options for the link editor (Note that ``formatting.a`` must be enabled).
+
+          Advanced Options Reference:
+
+          ``title`` (boolean)
+            Enabling "Title" allows to set the `title` attribute of the resulting `<a>`-Tag
+          ``targetBlank`` (boolean)
+            Enabling "Open in new window" allows to set the `target` attribute of the resulting `<a>`-Tag to `_blank`
+          ``relNofollow`` (boolean)
+            Enabling "No follow (SEO)" allows to set the `rel` attribute of the resulting `<a>`-Tag to `nofollow`
+          ``download`` (boolean)
+            Enabling "Force download" allows to set the `download` attribute of the resulting `<a>`-Tag
+
+          Additionally the configuration in ``linkTypes`` allows to further configure the types of link, see :ref:`property-editor-reference-linkeditor`.
 
         ``formatting``
           Various formatting options (see example below for all available options).
@@ -336,7 +339,6 @@ The following options are allowed for defining a NodeType:
             placeholder: i18n
             autoparagraph: true
             linking:
-              anchor: true
               title: true
               relNofollow: true
               targetBlank: true
@@ -388,8 +390,8 @@ The following options are allowed for defining a NodeType:
       ``editorListeners`` (removed since Neos 3.3)
         This feature has been removed in favor of `Depending Properties`_ with Neos 3.3
 
-    ``showInCreationDialog`` (since Neos 5.1)
-      If `true` the corresponding property will appear in the Node Creation Dialog. Editor configuration
+    ``showInCreationDialog``
+      If `true` the corresponding property will be promoted into the Node Creation Dialog. Editor configuration
       will be copied from the respective ``ui.inspector`` settings in that case and can be overridden with
       the ``creationDialog.elements.<propertyName>``, see `Node Creation Dialog Configuration`_
 

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\SiteKickstarter\Service;
@@ -13,10 +14,13 @@ namespace Neos\SiteKickstarter\Service;
  * source code.
  */
 
-use Neos\Flow\Reflection\ReflectionService;
 use Neos\Flow\Annotations as Flow;
+use Neos\Flow\Reflection\ReflectionService;
 use Neos\SiteKickstarter\Generator\SitePackageGeneratorInterface;
 
+/**
+ * @internal
+ */
 class SiteGeneratorCollectingService
 {
     /**
@@ -25,6 +29,9 @@ class SiteGeneratorCollectingService
      */
     protected $reflectionService;
 
+    /**
+     * @return list<class-string<SitePackageGeneratorInterface>>
+     */
     public function getAllGenerators(): array
     {
         return $this->reflectionService->getAllImplementationClassNamesForInterface(SitePackageGeneratorInterface::class);

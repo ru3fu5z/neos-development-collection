@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Domain\Model;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,11 +10,16 @@ namespace Neos\Neos\Domain\Model;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Domain\Model;
+
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Neos\Flow\Annotations as Flow;
 use Neos\Media\Domain\Model\AssetCollection;
+use Neos\Utility\Arrays;
 
 /**
  * Domain model of a site
@@ -28,8 +32,22 @@ class Site
     /**
      * Site states
      */
-    const STATE_ONLINE = 1;
-    const STATE_OFFLINE = 2;
+    public const STATE_ONLINE = 1;
+    public const STATE_OFFLINE = 2;
+
+    /**
+     * @var array
+     * @phpstan-var array<string,array<string,mixed>>
+     */
+    #[Flow\InjectConfiguration(path: 'sites')]
+    protected $sitesConfiguration = [];
+
+    /**
+     * @var array
+     * @phpstan-var array<string,mixed>
+     */
+    #[Flow\InjectConfiguration(path: 'sitePresets')]
+    protected $sitePresetsConfiguration = [];
 
     /**
      * Name of the site
@@ -45,7 +63,10 @@ class Site
      * Node name of this site in the content repository.
      *
      * The first level of nodes of a site can be reached via a path like
-     * "/Sites/MySite/" where "MySite" is the nodeName.
+     * "/<Neos.Neos:Sites>/my-site" where "my-site" is the nodeName.
+     *
+     * TODO use node aggregate identifier instead of node name
+     * see https://github.com/neos/neos-development-collection/issues/4470
      *
      * @var string
      * @Flow\Identity
@@ -57,6 +78,7 @@ class Site
 
     /**
      * @var Collection<Domain>
+     * @phpstan-var Collection<int,Domain>
      * @ORM\OneToMany(mappedBy="site")
      * @Flow\Lazy
      */
@@ -64,6 +86,7 @@ class Site
 
     /**
      * @var Domain
+     * @phpstan-var ?Domain
      * @ORM\ManyToOne
      * @ORM\Column(nullable=true)
      */
@@ -85,6 +108,7 @@ class Site
 
     /**
      * @var AssetCollection
+     * @phpstan-var ?AssetCollection
      * @ORM\ManyToOne
      */
     protected $assetCollection;
@@ -105,7 +129,7 @@ class Site
      */
     public function __toString()
     {
-        return $this->getNodeName();
+        return $this->getNodeName()->value;
     }
 
     /**
@@ -137,12 +161,12 @@ class Site
      * If you need to fetch the root node for this site, use the content
      * context, do not use the NodeDataRepository!
      *
-     * @return string The node name
+     * @return SiteNodeName The node name
      * @api
      */
-    public function getNodeName()
+    public function getNodeName(): SiteNodeName
     {
-        return $this->nodeName;
+        return SiteNodeName::fromString($this->nodeName);
     }
 
     /**
@@ -152,8 +176,11 @@ class Site
      * @return void
      * @api
      */
-    public function setNodeName($nodeName)
+    public function setNodeName(string|SiteNodeName $nodeName)
     {
+        if ($nodeName instanceof SiteNodeName) {
+            $nodeName = $nodeName->value;
+        }
         $this->nodeName = $nodeName;
     }
 
@@ -222,20 +249,20 @@ class Site
     }
 
     /**
-     * @param Collection<Domain> $domains
+     * @param Collection<int,Domain> $domains
      * @return void
      * @api
      */
     public function setDomains($domains)
     {
         $this->domains = $domains;
-        if (!$this->domains->contains($this->primaryDomain)) {
+        if (!$this->primaryDomain || !$this->domains->contains($this->primaryDomain)) {
             $this->primaryDomain = $this->getFirstActiveDomain();
         }
     }
 
     /**
-     * @return Collection<Domain>
+     * @return Collection<int,Domain>
      * @api
      */
     public function getDomains()
@@ -249,17 +276,18 @@ class Site
      */
     public function hasActiveDomains()
     {
-        return $this->domains->exists(function ($index, Domain $domain) {
+        return $this->domains->exists(function (int $index, Domain $domain) {
             return $domain->getActive();
         });
     }
 
     /**
-     * @return Collection<Domain>
+     * @return Collection<int,Domain>
      * @api
      */
     public function getActiveDomains()
     {
+        /** @var Collection<int, Domain> $activeDomains */
         $activeDomains = $this->domains->filter(function (Domain $domain) {
             return $domain->getActive();
         });
@@ -267,13 +295,13 @@ class Site
     }
 
     /**
-     * @return Domain|null
+     * @return ?Domain
      * @api
      */
     public function getFirstActiveDomain()
     {
         $activeDomains = $this->getActiveDomains();
-        return count($activeDomains) > 0 ? $this->getActiveDomains()->first() : null;
+        return count($activeDomains) > 0 ? ($activeDomains->first() ?: null) : null;
     }
 
     /**
@@ -283,7 +311,7 @@ class Site
      * @return void
      * @api
      */
-    public function setPrimaryDomain(Domain $domain = null)
+    public function setPrimaryDomain(?Domain $domain = null)
     {
         if ($domain === null) {
             $this->primaryDomain = null;
@@ -303,16 +331,22 @@ class Site
     /**
      * Returns the primary domain, if one has been defined.
      *
-     * @return Domain The primary domain or NULL
+     * @param boolean $fallbackToActive if true falls back to the first active domain instead returning null if no primary domain was explicitly set
+     * @return ?Domain The primary domain or NULL
      * @api
      */
-    public function getPrimaryDomain()
+    public function getPrimaryDomain(bool $fallbackToActive = true): ?Domain
     {
-        return isset($this->primaryDomain) && $this->primaryDomain->getActive() ? $this->primaryDomain : $this->getFirstActiveDomain();
+        if (!$fallbackToActive) {
+            return $this->primaryDomain;
+        }
+        return $this->primaryDomain instanceof Domain && $this->primaryDomain->getActive()
+            ? $this->primaryDomain
+            : $this->getFirstActiveDomain();
     }
 
     /**
-     * @return AssetCollection
+     * @return ?AssetCollection
      */
     public function getAssetCollection()
     {
@@ -323,7 +357,7 @@ class Site
      * @param AssetCollection $assetCollection
      * @return void
      */
-    public function setAssetCollection(AssetCollection $assetCollection = null)
+    public function setAssetCollection(?AssetCollection $assetCollection = null)
     {
         $this->assetCollection = $assetCollection;
     }
@@ -349,5 +383,29 @@ class Site
      */
     public function emitSiteChanged()
     {
+    }
+
+    public function getConfiguration(): SiteConfiguration
+    {
+        if (array_key_exists($this->nodeName, $this->sitesConfiguration)) {
+            $siteSettingsPath = $this->nodeName;
+        } else {
+            if (!array_key_exists('*', $this->sitesConfiguration)) {
+                throw new \RuntimeException(sprintf('Missing configuration for "Neos.Neos.sites.%s" or fallback "Neos.Neos.sites.*"', $this->nodeName), 1714230658);
+            }
+            $siteSettingsPath = '*';
+        }
+        $siteSettings = $this->sitesConfiguration[$siteSettingsPath];
+        if (isset($siteSettings['preset'])) {
+            if (!is_string($siteSettings['preset'])) {
+                throw new \RuntimeException(sprintf('Invalid "preset" configuration for "Neos.Neos.sites.%s". Expected string, got: %s', $siteSettingsPath, get_debug_type($siteSettings['preset'])), 1699785648);
+            }
+            if (!isset($this->sitePresetsConfiguration[$siteSettings['preset']]) || !is_array($this->sitePresetsConfiguration[$siteSettings['preset']])) {
+                throw new \RuntimeException(sprintf('Site settings "Neos.Neos.sites.%s" refer to a preset "%s", but no corresponding preset is configured', $siteSettingsPath, $siteSettings['preset']), 1699785736);
+            }
+            $siteSettings = Arrays::arrayMergeRecursiveOverrule($this->sitePresetsConfiguration[$siteSettings['preset']], $siteSettings);
+            unset($siteSettings['preset']);
+        }
+        return SiteConfiguration::fromArray($siteSettings);
     }
 }

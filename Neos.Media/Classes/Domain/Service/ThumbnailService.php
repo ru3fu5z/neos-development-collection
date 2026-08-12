@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Media\Domain\Service;
@@ -132,8 +133,16 @@ class ThumbnailService
         if (isset($this->thumbnailCache[$assetIdentifier][$configurationHash])) {
             $thumbnail = $this->thumbnailCache[$assetIdentifier][$configurationHash];
         } else {
-            $thumbnail = $this->thumbnailRepository->findOneByAssetAndThumbnailConfiguration($asset, $configuration);
-            $this->thumbnailCache[$assetIdentifier][$configurationHash] = $thumbnail;
+            $thumbnail = null;
+            // Load all thumbnails for the asset and cache them to prevent further db requests for the same asset
+            $thumbnailsForAsset = $this->thumbnailRepository->findByOriginalAsset($asset);
+            /** @var Thumbnail $thumbnailVariant */
+            foreach ($thumbnailsForAsset as $thumbnailVariant) {
+                $this->thumbnailCache[$assetIdentifier][$thumbnailVariant->getConfigurationHash()] = $thumbnailVariant;
+                if ($thumbnailVariant->getConfigurationHash() === $configurationHash) {
+                    $thumbnail = $thumbnailVariant;
+                }
+            }
         }
         $async = $configuration->isAsync();
         if ($thumbnail === null) {
@@ -247,7 +256,15 @@ class ThumbnailService
     {
         $resource = $thumbnail->getResource();
         if ($resource) {
-            return $this->resourceManager->getPublicPersistentResourceUri($resource);
+            $uri = $this->resourceManager->getPublicPersistentResourceUri($resource);
+            if ($uri === false) {
+                throw new ThumbnailServiceException(sprintf(
+                    'Could not generate URI for resource "%s".',
+                    $this->persistenceManager->getIdentifierByObject($resource)
+                ), 1737558490);
+            }
+
+            return $uri;
         }
 
         $staticResource = $thumbnail->getStaticResource();

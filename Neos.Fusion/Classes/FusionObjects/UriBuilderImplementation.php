@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\FusionObjects;
 
 /*
@@ -11,6 +12,9 @@ namespace Neos\Fusion\FusionObjects;
  * source code.
  */
 
+use GuzzleHttp\Psr7\ServerRequest;
+use Neos\Flow\Mvc\ActionRequest;
+use Neos\Flow\Mvc\Routing\UriBuilder;
 
 /**
  * A Fusion UriBuilder object
@@ -24,8 +28,6 @@ namespace Neos\Fusion\FusionObjects;
  *  * format
  *  * section
  *  * additionalParams
- *  * addQueryString
- *  * argumentsToBeExcludedFromQueryString
  *  * absolute
  *
  * See respective getters for descriptions
@@ -82,7 +84,7 @@ class UriBuilderImplementation extends AbstractFusionObject
     public function getArguments()
     {
         $arguments = $this->fusionValue('arguments');
-        return is_array($arguments) ? $arguments: [];
+        return is_array($arguments) ? $arguments : [];
     }
 
     /**
@@ -116,33 +118,13 @@ class UriBuilderImplementation extends AbstractFusionObject
     }
 
     /**
-     * Arguments to be removed from the URI. Only active if addQueryString = true
-     *
-     * @return array
-     */
-    public function getArgumentsToBeExcludedFromQueryString()
-    {
-        return $this->fusionValue('argumentsToBeExcludedFromQueryString');
-    }
-
-    /**
-     * If true, the current query parameters will be kept in the URI
-     *
-     * @return boolean
-     */
-    public function isAddQueryString()
-    {
-        return (boolean)$this->fusionValue('addQueryString');
-    }
-
-    /**
      * If true, an absolute URI is rendered
      *
      * @return boolean
      */
     public function isAbsolute()
     {
-        return (boolean)$this->fusionValue('absolute');
+        return (bool)$this->fusionValue('absolute');
     }
 
     /**
@@ -150,8 +132,19 @@ class UriBuilderImplementation extends AbstractFusionObject
      */
     public function evaluate()
     {
-        $controllerContext = $this->runtime->getControllerContext();
-        $uriBuilder = $controllerContext->getUriBuilder()->reset();
+        $uriBuilder = new UriBuilder();
+        $possibleRequest = $this->runtime->fusionGlobals->get('request');
+        if ($possibleRequest instanceof ActionRequest) {
+            $uriBuilder->setRequest($possibleRequest);
+        } else {
+            // unfortunately, the uri-builder always needs a request at hand and cannot build uris without
+            // even, if the default param merging would not be required
+            // this will improve with a reformed uri building:
+            // https://github.com/neos/flow-development-collection/pull/2744
+            $uriBuilder->setRequest(
+                ActionRequest::fromHttpRequest(ServerRequest::fromGlobals())
+            );
+        }
 
         $format = $this->getFormat();
         if ($format !== null) {
@@ -163,11 +156,6 @@ class UriBuilderImplementation extends AbstractFusionObject
             $uriBuilder->setArguments($additionalParams);
         }
 
-        $argumentsToBeExcludedFromQueryString = $this->getArgumentsToBeExcludedFromQueryString();
-        if ($argumentsToBeExcludedFromQueryString !== null) {
-            $uriBuilder->setArgumentsToBeExcludedFromQueryString($argumentsToBeExcludedFromQueryString);
-        }
-
         $absolute = $this->isAbsolute();
         if ($absolute === true) {
             $uriBuilder->setCreateAbsoluteUri(true);
@@ -176,11 +164,6 @@ class UriBuilderImplementation extends AbstractFusionObject
         $section = $this->getSection();
         if ($section !== null) {
             $uriBuilder->setSection($section);
-        }
-
-        $addQueryString = $this->isAddQueryString();
-        if ($addQueryString === true) {
-            $uriBuilder->setAddQueryString(true);
         }
 
         try {

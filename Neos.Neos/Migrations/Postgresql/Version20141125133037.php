@@ -1,8 +1,10 @@
 <?php
+
 namespace Neos\Flow\Persistence\Doctrine\Migrations;
 
-use Doctrine\Migrations\AbstractMigration;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
 
 /**
  * Create Event Log Table
@@ -13,9 +15,9 @@ class Version20141125133037 extends AbstractMigration
      * @param Schema $schema
      * @return void
      */
-    public function up(Schema $schema): void 
+    public function up(Schema $schema): void
     {
-        $this->abortIf($this->connection->getDatabasePlatform()->getName() != "postgresql");
+        $this->abortIf(!($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform));
 
         $this->addSql("CREATE SEQUENCE typo3_neos_eventlog_domain_model_event_uid_seq INCREMENT BY 1 MINVALUE 1 START 1");
         $this->addSql("CREATE TABLE typo3_neos_eventlog_domain_model_event (persistence_object_identifier VARCHAR(40) NOT NULL, parentevent VARCHAR(40) DEFAULT NULL, timestamp TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL, uid INT DEFAULT nextval('typo3_neos_eventlog_domain_model_event_uid_seq'), eventtype VARCHAR(255) NOT NULL, accountidentifier VARCHAR(255) DEFAULT NULL, data TEXT NOT NULL, dtype VARCHAR(255) NOT NULL, nodeidentifier VARCHAR(255) DEFAULT NULL, documentnodeidentifier VARCHAR(255) DEFAULT NULL, workspacename VARCHAR(255) DEFAULT NULL, dimension TEXT DEFAULT NULL, PRIMARY KEY(persistence_object_identifier))");
@@ -29,9 +31,9 @@ class Version20141125133037 extends AbstractMigration
      * @param Schema $schema
      * @return void
      */
-    public function down(Schema $schema): void 
+    public function down(Schema $schema): void
     {
-        $this->abortIf($this->connection->getDatabasePlatform()->getName() != "postgresql");
+        $this->abortIf(!($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform));
 
         $this->addSql("ALTER TABLE typo3_neos_eventlog_domain_model_event DROP CONSTRAINT FK_30AB3A75B684C08");
         $this->addSql("DROP TABLE typo3_neos_eventlog_domain_model_event");

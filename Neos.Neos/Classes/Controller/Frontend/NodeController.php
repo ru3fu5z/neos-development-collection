@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Controller\Frontend;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,34 +10,63 @@ namespace Neos\Neos\Controller\Frontend;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Controller\Frontend;
+
+use Neos\ContentRepository\Core\Projection\ContentGraph\Filter\FindClosestNodeFilter;
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAddress;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
+use Neos\ContentRepositoryRegistry\SubgraphCachingInMemory\SubgraphCachePool;
 use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Mvc\Controller\ActionController;
-use Neos\Flow\Mvc\Exception\NoSuchArgumentException;
+use Neos\Flow\Mvc\Exception\NoMatchingRouteException;
 use Neos\Flow\Property\PropertyMapper;
 use Neos\Flow\Security\Authorization\PrivilegeManagerInterface;
-use Neos\Flow\Session\Exception\SessionNotStartedException;
+use Neos\Flow\Security\Context as SecurityContext;
 use Neos\Flow\Session\SessionInterface;
-use Neos\Neos\Controller\Exception\NodeNotFoundException;
-use Neos\Neos\Controller\Exception\UnresolvableShortcutException;
-use Neos\Neos\Domain\Service\NodeShortcutResolver;
-use Neos\Neos\Exception as NeosException;
-use Neos\Neos\TypeConverter\NodeConverter;
+use Neos\Flow\Utility\Now;
+use Neos\Neos\Domain\Model\RenderingMode;
+use Neos\Neos\Domain\Service\NodeTypeNameFactory;
+use Neos\Neos\Domain\Service\RenderingModeService;
+use Neos\Neos\Domain\SubtreeTagging\NeosVisibilityConstraints;
+use Neos\Neos\FrontendRouting\Exception\InvalidShortcutException;
+use Neos\Neos\FrontendRouting\Exception\NodeNotFoundException;
+use Neos\Neos\FrontendRouting\NodeShortcutResolver;
+use Neos\Neos\FrontendRouting\NodeUriBuilderFactory;
+use Neos\Neos\FrontendRouting\SiteDetection\SiteDetectionResult;
+use Neos\Neos\Security\Authorization\ContentRepositoryAuthorizationService;
+use Neos\Neos\Utility\NodeTypeWithFallbackProvider;
 use Neos\Neos\View\FusionView;
-use Neos\ContentRepository\Domain\Model\NodeInterface;
-use Neos\ContentRepository\Domain\Service\ContextFactoryInterface;
 
-/**
- * Controller for displaying nodes in the frontend
- *
- * @Flow\Scope("singleton")
- */
 class NodeController extends ActionController
 {
+    use NodeTypeWithFallbackProvider;
+
+    #[Flow\Inject]
+    protected ContentRepositoryRegistry $contentRepositoryRegistry;
+
+    #[Flow\Inject]
+    protected SubgraphCachePool $subgraphCachePool;
+
     /**
      * @Flow\Inject
-     * @var ContextFactoryInterface
+     * @var PrivilegeManagerInterface
      */
-    protected $contextFactory;
+    protected $privilegeManager;
+
+    /**
+     * @Flow\Inject(lazy=false)
+     * @var Now
+     */
+    protected $now;
+
+    /**
+     * @Flow\Inject
+     * @var SecurityContext
+     */
+    protected $securityContext;
 
     /**
      * @Flow\Inject
@@ -53,6 +81,12 @@ class NodeController extends ActionController
     protected $nodeShortcutResolver;
 
     /**
+     * @Flow\Inject
+     * @var PropertyMapper
+     */
+    protected $propertyMapper;
+
+    /**
      * @var string
      */
     protected $defaultViewObjectName = FusionView::class;
@@ -62,103 +96,143 @@ class NodeController extends ActionController
      */
     protected $view;
 
-    /**
-     * @Flow\Inject
-     * @var PrivilegeManagerInterface
-     */
-    protected $privilegeManager;
+    #[Flow\Inject]
+    protected RenderingModeService $renderingModeService;
+
+    #[Flow\InjectConfiguration(path: "frontend.shortcutRedirectHttpStatusCode", package: "Neos.Neos")]
+    protected int $shortcutRedirectHttpStatusCode;
+
+    #[Flow\Inject]
+    protected NodeUriBuilderFactory $nodeUriBuilderFactory;
+
+    #[Flow\Inject]
+    protected ContentRepositoryAuthorizationService $contentRepositoryAuthorizationService;
+
+    #[Flow\Inject]
+    protected ContentSubgraphCacheWarmup|null $contentSubgraphCacheWarmup = null;
 
     /**
-     * @Flow\Inject
-     * @var PropertyMapper
+     * @param string $node
+     * @throws NodeNotFoundException
+     * @throws \Neos\Flow\Mvc\Exception\StopActionException
+     * @throws \Neos\Flow\Mvc\Routing\Exception\MissingActionNameException
+     * @throws \Neos\Flow\Session\Exception\SessionNotStartedException
+     * @throws \Neos\Neos\Exception
+     * @Flow\SkipCsrfProtection We need to skip CSRF protection here because this action could be called
+     * with unsafe requests from widgets or plugins that are rendered on the node
+     * - For those the CSRF token is validated on the sub-request, so it is safe to be skipped here
      */
-    protected $propertyMapper;
-
-    /**
-     * Allow invisible nodes to be redirected to
-     *
-     * @return void
-     */
-    protected function initializeShowAction(): void
+    public function previewAction(string $node): void
     {
-        if ($this->arguments->hasArgument('node')
-            && $this->request->hasArgument('showInvisible')
-            && (bool)$this->request->getArgument('showInvisible')
-            && $this->privilegeManager->isPrivilegeTargetGranted('Neos.Neos:Backend.GeneralAccess')
+        // @todo add $renderingModeName as parameter and append it for successive links again as get parameter to node uris
+        $renderingMode = $this->renderingModeService->findByCurrentUser();
+        $siteDetectionResult = SiteDetectionResult::fromRequest($this->request->getHttpRequest());
+        $contentRepository = $this->contentRepositoryRegistry->get($siteDetectionResult->contentRepositoryId);
+
+        $nodeAddress = NodeAddress::fromJsonString($node);
+
+        $subgraph = $contentRepository->getContentSubgraph($nodeAddress->workspaceName, $nodeAddress->dimensionSpacePoint);
+
+        $nodeInstance = $subgraph->findNodeById($nodeAddress->aggregateId);
+
+        if (is_null($nodeInstance)) {
+            throw new NodeNotFoundException(
+                'The requested node does not exist or isn\'t accessible to the current user',
+                1430218623
+            );
+        }
+
+        $site = $subgraph->findClosestNode($nodeAddress->aggregateId, FindClosestNodeFilter::create(nodeTypes: NodeTypeNameFactory::NAME_SITE));
+        if ($site === null) {
+            throw new NodeNotFoundException(
+                sprintf('No site node ("Neos.Neos:Site") found for node %s using visibility constraints %s', $nodeAddress->toJson(), $subgraph->getVisibilityConstraints()->toJson())
+            );
+        }
+
+        $this->contentSubgraphCacheWarmup?->fillCacheWithContentNodes($nodeAddress->aggregateId, $subgraph);
+
+        if (
+            $this->getNodeType($nodeInstance)->isOfType(NodeTypeNameFactory::NAME_SHORTCUT)
+            && !$renderingMode->isEdit
+            && $nodeAddress->workspaceName->isLive() // shortcuts are only resolvable for the live workspace
         ) {
-            $this->arguments->getArgument('node')->getPropertyMappingConfiguration()->setTypeConverterOption(NodeConverter::class, NodeConverter::INVISIBLE_CONTENT_SHOWN, true);
-        }
-    }
-
-    /**
-     * Shows the specified node and takes visibility and access restrictions into
-     * account.
-     *
-     * @param NodeInterface $node
-     * @return string View output for the specified node
-     * @throws NodeNotFoundException | UnresolvableShortcutException | NeosException
-     * We need to skip CSRF protection here because this action could be called with unsafe requests from widgets or plugins that are rendered on the node - For those the CSRF token is validated on the sub-request, so it is safe to be skipped here
-     * @Flow\SkipCsrfProtection
-     * @Flow\IgnoreValidation("node")
-     */
-    public function showAction(NodeInterface $node = null)
-    {
-        if ($node === null || !$node->getContext()->isLive()) {
-            throw new NodeNotFoundException('The requested node does not exist or isn\'t accessible to the current user', 1430218623);
+            $this->handleShortcutNode($nodeAddress);
         }
 
-        if ($node->getNodeType()->isOfType('Neos.Neos:Shortcut')) {
-            $this->handleShortcutNode($node);
-        }
+        $this->view->setOption('renderingModeName', $renderingMode->name);
 
-        $this->view->assign('value', $node);
-    }
+        $this->view->assignMultiple([
+            'value' => $nodeInstance,
+            'site' => $site,
+        ]);
 
-    /**
-     * Allow invisible nodes to be previewed
-     *
-     * @return void
-     * @throws NoSuchArgumentException
-     */
-    protected function initializePreviewAction(): void
-    {
-        if ($this->arguments->hasArgument('node') && $this->privilegeManager->isPrivilegeTargetGranted('Neos.Neos:Backend.GeneralAccess')) {
-            $this->arguments->getArgument('node')->getPropertyMappingConfiguration()->setTypeConverterOption(NodeConverter::class, NodeConverter::INVISIBLE_CONTENT_SHOWN, true);
-        }
-    }
-
-    /**
-     * Previews a node that is not live (i.e. for the Backend Preview & Edit Mode)
-     *
-     * @param NodeInterface $node
-     * @return string View output for the specified node
-     * @throws NeosException | NodeNotFoundException | SessionNotStartedException | UnresolvableShortcutException
-     * @Flow\IgnoreValidation("node")
-     */
-    public function previewAction(NodeInterface $node = null)
-    {
-        if ($node === null) {
-            throw new NodeNotFoundException('The requested node does not exist or isn\'t accessible to the current user', 1430218623);
-        }
-
-        $inBackend = $node->getContext()->isInBackend();
-
-        if ($node->getNodeType()->isOfType('Neos.Neos:Shortcut') && !$inBackend) {
-            $this->handleShortcutNode($node);
-        }
-
-        $this->view->assign('value', $node);
-
-        if ($inBackend) {
+        if ($renderingMode->isEdit) {
             $this->overrideViewVariablesFromInternalArguments();
             $this->response->setHttpHeader('Cache-Control', 'no-cache');
             if (!$this->view->canRenderWithNodeAndPath()) {
                 $this->view->setFusionPath('rawContent');
             }
-            if ($this->session->isStarted()) {
-                $this->session->putData('lastVisitedNode', $node->getContextPath());
-            }
         }
+    }
+
+    /**
+     * Initializes the view with the necessary parameters encoded in the given NodeAddress
+     *
+     * @param string $node Legacy name for backwards compatibility of route components
+     * @throws NodeNotFoundException
+     * @throws \Neos\Flow\Mvc\Exception\StopActionException
+     * @throws \Neos\Flow\Mvc\Routing\Exception\MissingActionNameException
+     * @throws \Neos\Flow\Session\Exception\SessionNotStartedException
+     * @throws \Neos\Neos\Exception
+     * @Flow\SkipCsrfProtection We need to skip CSRF protection here because this action could be called
+     * with unsafe requests from widgets or plugins that are rendered on the node
+     * - For those the CSRF token is validated on the sub-request, so it is safe to be skipped here
+     */
+    public function showAction(string $node): void
+    {
+        $nodeAddress = NodeAddress::fromJsonString($node);
+
+        if (!$nodeAddress->workspaceName->isLive()) {
+            throw new NodeNotFoundException('The requested node isn\'t accessible to the current user', 1430218623);
+        }
+
+        $contentRepository = $this->contentRepositoryRegistry->get($nodeAddress->contentRepositoryId);
+        $visibilityConstraints = $this->contentRepositoryAuthorizationService->getVisibilityConstraints($contentRepository->id, $this->securityContext->getRoles());
+        // By default, the visibility constraints only contain the SubtreeTags the authenticated user has _no_ access to
+        // Neos backend users have access to the "disabled" SubtreeTag so that they can see/edit disabled nodes.
+        // In this showAction (= "frontend") we have to explicitly remove those disabled nodes, even if the user was authenticated,
+        // to ensure that disabled nodes are NEVER shown recursively.
+        $visibilityConstraints = $visibilityConstraints->merge(NeosVisibilityConstraints::excludeDisabled());
+        $subgraph = $this->subgraphCachePool->getContentSubgraph($contentRepository, $nodeAddress->workspaceName, $nodeAddress->dimensionSpacePoint, $visibilityConstraints);
+
+        $nodeInstance = $subgraph->findNodeById($nodeAddress->aggregateId);
+        if ($nodeInstance === null) {
+            throw new NodeNotFoundException(
+                sprintf('The cached node %s for this uri could not be resolved using visibility constraints %s. Possibly you have to flush the "Flow_Mvc_Routing_Route" cache.', $nodeAddress->toJson(), $subgraph->getVisibilityConstraints()->toJson()),
+                1707300738
+            );
+        }
+
+        $site = $subgraph->findClosestNode($nodeAddress->aggregateId, FindClosestNodeFilter::create(nodeTypes: NodeTypeNameFactory::NAME_SITE));
+        if ($site === null) {
+            throw new NodeNotFoundException(
+                sprintf('No site node ("Neos.Neos:Site") found for node %s using visibility constraints %s', $nodeAddress->toJson(), $subgraph->getVisibilityConstraints()->toJson()),
+                1783934822
+            );
+        }
+
+        $this->contentSubgraphCacheWarmup?->fillCacheWithContentNodes($nodeAddress->aggregateId, $subgraph);
+
+        if ($this->getNodeType($nodeInstance)->isOfType(NodeTypeNameFactory::NAME_SHORTCUT)) {
+            $this->handleShortcutNode($nodeAddress);
+        }
+
+        $this->view->setOption('renderingModeName', RenderingMode::FRONTEND);
+
+        $this->view->assignMultiple([
+            'value' => $nodeInstance,
+            'site' => $site,
+        ]);
     }
 
     /**
@@ -173,42 +247,63 @@ class NodeController extends ActionController
     protected function overrideViewVariablesFromInternalArguments()
     {
         if (($nodeContextPath = $this->request->getInternalArgument('__nodeContextPath')) !== null) {
-            $node = $this->propertyMapper->convert($nodeContextPath, NodeInterface::class);
-            if (!$node instanceof NodeInterface) {
-                throw new NodeNotFoundException(sprintf('The node with context path "%s" could not be resolved', $nodeContextPath), 1437051934);
+            assert(is_string($nodeContextPath));
+            $node = $this->propertyMapper->convert($nodeContextPath, Node::class);
+            if (!$node instanceof Node) {
+                throw new NodeNotFoundException(sprintf(
+                    'The node with context path "%s" could not be resolved',
+                    $nodeContextPath
+                ), 1437051934);
             }
             $this->view->assign('value', $node);
         }
 
         if (($affectedNodeContextPath = $this->request->getInternalArgument('__affectedNodeContextPath')) !== null) {
+            assert(is_string($affectedNodeContextPath));
             $this->response->setHttpHeader('X-Neos-AffectedNodePath', $affectedNodeContextPath);
         }
 
         if (($fusionPath = $this->request->getInternalArgument('__fusionPath')) !== null) {
+            assert(is_string($fusionPath));
             $this->view->setFusionPath($fusionPath);
         }
     }
 
     /**
-     * Handles redirects to shortcut targets in live rendering.
+     * Handles redirects to shortcut targets of nodes in the live workspace.
      *
-     * @param NodeInterface $node
-     * @return void
-     * @throws NodeNotFoundException|UnresolvableShortcutException
+     * @throws NodeNotFoundException
+     * @throws \Neos\Flow\Mvc\Exception\StopActionException
      */
-    protected function handleShortcutNode(NodeInterface $node)
+    protected function handleShortcutNode(NodeAddress $nodeAddress): void
     {
-        $resolvedNode = $this->nodeShortcutResolver->resolveShortcutTarget($node);
-        if ($resolvedNode === null) {
-            throw new NodeNotFoundException(sprintf('The shortcut node target of node "%s" could not be resolved', $node->getPath()), 1430218730);
-        } elseif (is_string($resolvedNode)) {
-            $this->redirectToUri($resolvedNode);
-        } elseif ($resolvedNode instanceof NodeInterface && $resolvedNode === $node) {
-            throw new NodeNotFoundException('The requested node does not exist or isn\'t accessible to the current user', 1502793585);
-        } elseif ($resolvedNode instanceof NodeInterface) {
-            $this->redirect('show', null, null, ['node' => $resolvedNode]);
-        } else {
-            throw new UnresolvableShortcutException(sprintf('The shortcut node target of node "%s" resolves to an unsupported type "%s"', $node->getPath(), is_object($resolvedNode) ? get_class($resolvedNode) : gettype($resolvedNode)), 1430218738);
+        try {
+            $resolvedTarget = $this->nodeShortcutResolver->resolveShortcutTarget($nodeAddress);
+        } catch (InvalidShortcutException $e) {
+            throw new NodeNotFoundException(sprintf(
+                'The shortcut node target of node %s could not be resolved: %s',
+                $nodeAddress->toJson(),
+                $e->getMessage()
+            ), 1430218730, $e);
         }
+        if ($resolvedTarget instanceof NodeAddress) {
+            if ($nodeAddress->equals($resolvedTarget)) {
+                return;
+            }
+            try {
+                $resolvedUri = $this->nodeUriBuilderFactory->forActionRequest($this->request)
+                    ->uriFor($nodeAddress);
+            } catch (NoMatchingRouteException $e) {
+                throw new NodeNotFoundException(sprintf(
+                    'The shortcut node target of node %s could not be resolved: %s',
+                    $nodeAddress->toJson(),
+                    $e->getMessage()
+                ), 1599670695, $e);
+            }
+        } else {
+            $resolvedUri = $resolvedTarget;
+        }
+
+        $this->redirectToUri($resolvedUri, statusCode: $this->shortcutRedirectHttpStatusCode);
     }
 }

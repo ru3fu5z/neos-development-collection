@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser\Exception;
@@ -17,6 +18,7 @@ use Neos\Fusion\Exception;
 
 /**
  * This exception is thrown when the Parser encounters an unexpected character
+ * @internal
  */
 class ParserUnexpectedCharException extends Exception
 {

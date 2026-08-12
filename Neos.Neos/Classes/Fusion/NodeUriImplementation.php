@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Fusion;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,69 +10,86 @@ namespace Neos\Neos\Fusion;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Fusion;
+
+use GuzzleHttp\Psr7\ServerRequest;
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepository\Core\SharedModel\Node\NodeAddress;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
 use Neos\Flow\Annotations as Flow;
-use Neos\Flow\Log\ThrowableStorageInterface;
 use Neos\Flow\Log\Utility\LogEnvironment;
-use Neos\Neos\Service\LinkingService;
+use Neos\Flow\Mvc\ActionRequest;
+use Neos\Flow\Mvc\Exception\NoMatchingRouteException;
 use Neos\Fusion\FusionObjects\AbstractFusionObject;
-use Neos\Neos\Exception as NeosException;
+use Neos\Neos\FrontendRouting\NodeUriBuilderFactory;
+use Neos\Neos\FrontendRouting\Options;
+use Neos\Neos\Utility\LegacyNodePathNormalizer;
+use Neos\Neos\Utility\NodePathResolver;
 use Psr\Log\LoggerInterface;
 
 /**
  * Create a link to a node
+ *
+ * If the node is passed as string the base node is required.
+ * Following string syntax is allowed:
+ *
+ *  - /<Neos.Neos:Sites>/my-site/main
+ *  - some/relative/path
+ *
+ * Deprecated syntax:
+ *
+ *  - /sites/site/absolute/path
+ *  - ~/site-relative/path
+ *  - ~
+ *
+ * Not supported syntax:
+ *
+ *  - ./neos/info
+ *  - ../foo/../../bar
+ *
  */
 class NodeUriImplementation extends AbstractFusionObject
 {
     /**
      * @Flow\Inject
-     * @var LinkingService
+     * @var ContentRepositoryRegistry
      */
-    protected $linkingService;
+    protected $contentRepositoryRegistry;
 
     /**
+     * @Flow\Inject
      * @var LoggerInterface
      */
-    private $logger;
+    protected $systemLogger;
 
     /**
-     * @var ThrowableStorageInterface
+     * @Flow\Inject
+     * @var NodeUriBuilderFactory
      */
-    private $throwableStorage;
+    protected $nodeUriBuilderFactory;
 
     /**
-     * @param LoggerInterface $logger
+     * @Flow\Inject
+     * @var NodePathResolver
      */
-    public function injectLogger(LoggerInterface $logger)
-    {
-        $this->logger = $logger;
-    }
+    protected $nodeAddressNormalizer;
 
     /**
-     * @param ThrowableStorageInterface $throwableStorage
+     * @Flow\Inject
+     * @var LegacyNodePathNormalizer
      */
-    public function injectThrowableStorage(ThrowableStorageInterface $throwableStorage)
-    {
-        $this->throwableStorage = $throwableStorage;
-    }
-
-    /**
-     * A node object or a string node path or NULL to resolve the current document node
-     *
-     * @return mixed
-     */
-    public function getNode()
-    {
-        return $this->fusionValue('node');
-    }
+    protected $legacyNodePathNormalizer;
 
     /**
      * The requested format, for example "html"
      *
      * @return string
      */
-    public function getFormat()
+    public function getFormat(): string
     {
-        return $this->fusionValue('format');
+        return (string)$this->fusionValue('format');
     }
 
     /**
@@ -89,31 +105,11 @@ class NodeUriImplementation extends AbstractFusionObject
     /**
      * Additional query parameters that won't be prefixed like $arguments (overrule $arguments)
      *
-     * @return array
+     * @return array<string,mixed>
      */
-    public function getAdditionalParams()
+    public function getAdditionalParams(): array
     {
         return array_merge($this->fusionValue('additionalParams'), $this->fusionValue('arguments'));
-    }
-
-    /**
-     * Arguments to be removed from the URI. Only active if addQueryString = true
-     *
-     * @return array
-     */
-    public function getArgumentsToBeExcludedFromQueryString()
-    {
-        return $this->fusionValue('argumentsToBeExcludedFromQueryString');
-    }
-
-    /**
-     * If true, the current query parameters will be kept in the URI
-     *
-     * @return boolean
-     */
-    public function getAddQueryString()
-    {
-        return (boolean)$this->fusionValue('addQueryString');
     }
 
     /**
@@ -123,7 +119,7 @@ class NodeUriImplementation extends AbstractFusionObject
      */
     public function isAbsolute()
     {
-        return (boolean)$this->fusionValue('absolute');
+        return (bool)$this->fusionValue('absolute');
     }
 
     /**
@@ -131,45 +127,75 @@ class NodeUriImplementation extends AbstractFusionObject
      *
      * @return string
      */
-    public function getBaseNodeName()
+    public function getBaseNodeName(): string
     {
-        return $this->fusionValue('baseNodeName');
+        return $this->fusionValue('baseNodeName') ?: 'documentNode';
     }
 
     /**
      * Render the Uri.
      *
      * @return string The rendered URI or NULL if no URI could be resolved for the given node
-     * @throws NeosException
      */
     public function evaluate()
     {
-        $baseNode = null;
-        $baseNodeName = $this->getBaseNodeName() ?: 'documentNode';
-        $currentContext = $this->runtime->getCurrentContext();
-        if (isset($currentContext[$baseNodeName])) {
-            $baseNode = $currentContext[$baseNodeName];
+        $node = $this->fusionValue('node');
+        if (is_string($node)) {
+            $currentContext = $this->runtime->getCurrentContext();
+            $baseNode = $currentContext[$this->getBaseNodeName()] ?? null;
+            if (!$baseNode instanceof Node) {
+                throw new \RuntimeException(sprintf(
+                    'If "node" is passed as string a base node in must be set in "%s". Given: %s',
+                    $this->getBaseNodeName(),
+                    get_debug_type($baseNode)
+                ), 1719996392);
+            }
+
+            $possibleAbsoluteNodePath = $this->legacyNodePathNormalizer->tryResolveLegacyPathSyntaxToAbsoluteNodePath($node, $baseNode);
+            $nodeAddress = $this->nodeAddressNormalizer->resolveNodeAddressByPath(
+                $possibleAbsoluteNodePath ?? $node,
+                $baseNode
+            );
+        } elseif ($node instanceof Node) {
+            $nodeAddress = NodeAddress::fromNode($node);
         } else {
-            throw new NeosException(sprintf('Could not find a node instance in Fusion context with name "%s" and no node instance was given to the node argument. Set a node instance in the Fusion context or pass a node object to resolve the URI.', $baseNodeName), 1373100400);
+            throw new \RuntimeException(sprintf(
+                'The "node" argument can only be a string or an instance of `Node`. Given: %s',
+                get_debug_type($node)
+            ), 1719996456);
+        }
+
+        $possibleRequest = $this->runtime->fusionGlobals->get('request');
+        if ($possibleRequest instanceof ActionRequest) {
+            $nodeUriBuilder = $this->nodeUriBuilderFactory->forActionRequest($possibleRequest);
+        } else {
+            // unfortunately, the uri-builder always needs a request at hand and cannot build uris without it
+            // this will improve with a reformed uri building:
+            // https://github.com/neos/flow-development-collection/issues/3354
+            $nodeUriBuilder = $this->nodeUriBuilderFactory->forActionRequest(ActionRequest::fromHttpRequest(ServerRequest::fromGlobals()));
+        }
+
+        $options = $this->isAbsolute() ? Options::createForceAbsolute() : Options::createEmpty();
+        $format = $this->getFormat() ?: $possibleRequest->getFormat();
+        if ($format && $format !== 'html') {
+            $options = $options->withCustomFormat($format);
+        }
+        if ($routingArguments = $this->getAdditionalParams()) {
+            $options = $options->withCustomRoutingArguments($routingArguments);
         }
 
         try {
-            return $this->linkingService->createNodeUri(
-                $this->runtime->getControllerContext(),
-                $this->getNode(),
-                $baseNode,
-                $this->getFormat(),
-                $this->isAbsolute(),
-                $this->getAdditionalParams(),
-                $this->getSection(),
-                $this->getAddQueryString(),
-                $this->getArgumentsToBeExcludedFromQueryString()
-            );
-        } catch (NeosException $exception) {
-            // TODO: Revisit if we actually need to store a stack trace.
-            $logMessage = $this->throwableStorage->logThrowable($exception);
-            $this->logger->error($logMessage, LogEnvironment::fromMethodName(__METHOD__));
+            $resolvedUri = $nodeUriBuilder->uriFor($nodeAddress, $options);
+        } catch (NoMatchingRouteException) {
+            // todo log arguments?
+            $this->systemLogger->warning(sprintf('Could not resolve "%s" to a node uri.', $nodeAddress->aggregateId->value), LogEnvironment::fromMethodName(__METHOD__));
             return '';
         }
+
+        if ($this->getSection() !== '') {
+            $resolvedUri = $resolvedUri->withFragment($this->getSection());
+        }
+
+        return (string)$resolvedUri;
     }
 }

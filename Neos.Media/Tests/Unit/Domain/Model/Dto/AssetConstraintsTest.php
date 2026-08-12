@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Tests\Unit\Domain\Model\Dto;
 
 /*
@@ -222,7 +223,7 @@ class AssetConstraintsTest extends UnitTestCase
      * @test
      * @dataProvider applyToAssetSourceIdentifiersDataProvider
      */
-    public function applyToAssetSourceIdentifiersTests(array $allowedAssetSourceIdentifiers, string $assetSourceIdentifier = null, string $expectedResult = null): void
+    public function applyToAssetSourceIdentifiersTests(array $allowedAssetSourceIdentifiers, ?string $assetSourceIdentifier = null, ?string $expectedResult = null): void
     {
         $constraints = AssetConstraints::create()->withAssetSourceConstraint($allowedAssetSourceIdentifiers);
         self::assertSame($expectedResult, $constraints->applyToAssetSourceIdentifiers($assetSourceIdentifier));

@@ -147,6 +147,9 @@
 			<trans-unit id="cantPublishBecauseTargetWorkspaceIsReadOnly" xml:space="preserve">
 				<source>Can't publish because the target workspace is read-only</source>
 			</trans-unit>
+			<trans-unit id="cantPublishSingleNodeInNewPage" xml:space="preserve">
+      	<source>Can't publish a single node in a new page</source>
+      </trans-unit>
 			<trans-unit id="selectTargetWorkspace" xml:space="preserve">
 				<source>Select target workspace</source>
 			</trans-unit>
@@ -383,6 +386,11 @@
 				<source>This is a shortcut to the parent page.&lt;br /&gt;Click {0} to continue to the page.</source>
 			</trans-unit>
 
+			<!-- not visible documents -->
+			<trans-unit id="notVisibleDocument.message" xml:space="preserve">
+				<source>This page is currently hidden and is not visible in this workspace.</source>
+			</trans-unit>
+
 			<!-- javascript -->
 			<trans-unit id="content.components.contentContextBar.fullScreenButton.title" xml:space="preserve">
 				<source>Full Screen</source>
@@ -397,23 +405,8 @@
 			<trans-unit id="discardAll" xml:space="preserve">
 				<source>Discard all</source>
 			</trans-unit>
-			<trans-unit id="content.components.discardAllDialog.discardAllChangesHeader" xml:space="preserve">
-				<source>Discard all changes</source>
-			</trans-unit>
-			<trans-unit id="content.components.discardAllDialog.discardAllChangesSubheader" xml:space="preserve">
-				<source>Are you sure that you want to discard all changes in this workspace?</source>
-			</trans-unit>
-			<trans-unit id="content.components.discardAllDialog.discardXChangesSubheader" xml:space="preserve">
-				<source>Are you sure that you want to discard {numberOfChanges} change(s) in this workspace?</source>
-			</trans-unit>
 			<trans-unit id="publishAll" xml:space="preserve">
 				<source>Publish all</source>
-			</trans-unit>
-			<trans-unit id="content.components.publishAllDialog.header" xml:space="preserve">
-				<source>Publish all changes</source>
-			</trans-unit>
-			<trans-unit id="content.components.publishAllDialog.subheader" xml:space="preserve">
-				<source>Are you sure that you want to publish all changes?</source>
 			</trans-unit>
 			<trans-unit id="content.components.dirtyWorkspaceDialog.dirtyWorkspaceHeader" xml:space="preserve">
 				<source>Pending changes</source>
@@ -450,18 +443,6 @@
 			</trans-unit>
 			<trans-unit id="content.inspector.unappliedChangesDialog.button.success" xml:space="preserve">
 				<source>Apply</source>
-			</trans-unit>
-			<trans-unit id="content.inspector.editors.masterPluginEditor.selectPlugin" xml:space="preserve">
-				<source>Select a Plugin</source>
-			</trans-unit>
-			<trans-unit id="content.inspector.editors.masterPluginEditor.noPluginConfigured" xml:space="preserve">
-				<source>No plugin configured</source>
-			</trans-unit>
-			<trans-unit id="content.inspector.editors.pluginViewsEditor.displayedOnPage" xml:space="preserve">
-				<source>view is displayed on page</source>
-			</trans-unit>
-			<trans-unit id="content.inspector.editors.pluginViewsEditor.displayedOnCurrentPage" xml:space="preserve">
-				<source>view is displayed on current page</source>
 			</trans-unit>
 			<trans-unit id="content.inspector.editors.dateTimeEditor.noDateSet" xml:space="preserve">
 				<source>No date set</source>
@@ -651,6 +632,12 @@
 			</trans-unit>
 
 			<!-- Login -->
+			<trans-unit id="login.contentRepositoryError.title" xml:space="preserve">
+				<source>Content Repository Error</source>
+			</trans-unit>
+			<trans-unit id="login.contentRepositoryError.message" xml:space="preserve">
+				<source>A critical error was detected in the content repository. Please contact your administrator. More details are available via ./flow cr:status.</source>
+			</trans-unit>
 			<trans-unit id="login.index.title" xml:space="preserve">
 				<source>Login to</source>
 			</trans-unit>
@@ -678,16 +665,6 @@
 				<source>Technical Information</source>
 			</trans-unit>
 
-			<trans-unit id="error.exception.noHomepageException.title" xml:space="preserve">
-				<source>Missing Homepage</source>
-			</trans-unit>
-			<trans-unit id="error.exception.noHomepageException.description" xml:space="preserve">
-				<source>Either no site has been defined, the site does not contain a homepage or the active site couldn't be determined.</source>
-			</trans-unit>
-			<trans-unit id="error.exception.noHomepageException.setupMessage" xml:space="preserve">
-				<source>You might want to set the site's domain or import a new site in the setup.</source>
-			</trans-unit>
-
 			<trans-unit id="error.exception.databaseConnectionExceptions.title" xml:space="preserve">
 				<source>Database Error</source>
 			</trans-unit>
@@ -704,6 +681,10 @@
 			<trans-unit id="error.exception.notFoundExceptions.description" xml:space="preserve">
 				<source>Sorry, the page you requested was not found.</source>
 			</trans-unit>
+			<trans-unit id="error.exception.notFoundExceptions.setupMessage" xml:space="preserve">
+				<source>You might want to import or create a new site in the setup.</source>
+			</trans-unit>
+
 			<trans-unit id="error.invalidNodeType.title" xml:space="preserve">
 				<source>Invalid NodeType</source>
 			</trans-unit>
@@ -724,11 +705,6 @@
 			</trans-unit>
 			<trans-unit id="error.nodeTree.load" xml:space="preserve">
 				<source>Node Tree loading error.</source>
-			</trans-unit>
-
-			<!-- FlashMessages -->
-			<trans-unit id="flashMessage.1222204027" xml:space="preserve">
-				<source>The entered username or password was wrong</source>
 			</trans-unit>
 
 			<!-- Miscellaneous -->

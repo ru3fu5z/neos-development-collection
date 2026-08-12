@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Tests\Unit\Core\Parser;
 
 /*
@@ -11,10 +12,11 @@ namespace Neos\Fusion\Tests\Unit\Core\Parser;
  * source code.
  */
 
-use Neos\Fusion\Core\Parser;
+use Neos\Flow\Tests\UnitTestCase;
 use Neos\Fusion\Core\Cache\ParserCache;
 use Neos\Fusion\Core\ObjectTreeParser\Exception\ParserException;
-use Neos\Flow\Tests\UnitTestCase;
+use Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage\MessageLinePart;
+use Neos\Fusion\Core\Parser;
 
 class ParserExceptionTest extends UnitTestCase
 {
@@ -234,6 +236,11 @@ class ParserExceptionTest extends UnitTestCase
             'Unclosed comment.'
         ];
 
+        yield 'unclosed multiline comment with multiple stars' => [
+            '/***',
+            'Unclosed comment.'
+        ];
+
         yield 'unclosed eel expression' => [
             'a = ${',
             'Unclosed eel expression.'
@@ -325,5 +332,27 @@ class ParserExceptionTest extends UnitTestCase
         } catch (ParserException $e) {
             self::assertSame($expectedMessage, $e->getHelperMessagePart());
         }
+    }
+
+    /**
+     * @test
+     */
+    public function messageLinePartWorks()
+    {
+        $part = new MessageLinePart('abcd');
+
+        self::assertSame('', $part->char(-5));
+        self::assertSame('a', $part->char(-4));
+        self::assertSame('b', $part->char(-3));
+        self::assertSame('c', $part->char(-2));
+        self::assertSame('d', $part->char(-1));
+        self::assertSame('a', $part->char());
+        self::assertSame('a', $part->char(0));
+        self::assertSame('b', $part->char(1));
+        self::assertSame('c', $part->char(2));
+        self::assertSame('d', $part->char(3));
+        self::assertSame('', $part->char(4));
+        self::assertSame('abcd', $part->line());
+        self::assertSame('bcd', $part->line(1));
     }
 }

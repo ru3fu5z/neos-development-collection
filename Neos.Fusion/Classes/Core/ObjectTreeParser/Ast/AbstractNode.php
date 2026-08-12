@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser\Ast;
@@ -13,12 +14,12 @@ namespace Neos\Fusion\Core\ObjectTreeParser\Ast;
  * source code.
  */
 
+use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Core\ObjectTreeParser\AstNodeVisitorInterface;
 
-use Neos\Flow\Annotations as Flow;
-
+/** @internal */
 #[Flow\Proxy(false)]
-abstract class AbstractNode
+abstract readonly class AbstractNode
 {
-    abstract public function visit(AstNodeVisitorInterface $visitor, ...$args);
+    abstract public function visit(AstNodeVisitorInterface $visitor, mixed ...$args);
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Afx\Dsl;
 
 /*
@@ -13,10 +14,10 @@ namespace Neos\Fusion\Afx\Dsl;
 
 use Neos\Flow\Annotations as Flow;
 use Neos\Fusion;
-use Neos\Fusion\Core\DslInterface;
-use Neos\Fusion\Afx\Service\AfxService;
 use Neos\Fusion\Afx\Exception\AfxException;
 use Neos\Fusion\Afx\Parser\AfxParserException;
+use Neos\Fusion\Afx\Service\AfxService;
+use Neos\Fusion\Core\DslInterface;
 
 /**
  * Class Fusion AFX Dsl
@@ -32,7 +33,7 @@ class AfxDslImplementation implements DslInterface
      * @return string
      * @throws Fusion\Exception
      */
-    public function transpile($code)
+    public function transpile(string $code): string
     {
         try {
             return AfxService::convertAfxToFusion($code);

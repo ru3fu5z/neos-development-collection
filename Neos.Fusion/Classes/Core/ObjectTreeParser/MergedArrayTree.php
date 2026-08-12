@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser;
@@ -16,6 +17,9 @@ namespace Neos\Fusion\Core\ObjectTreeParser;
 use Neos\Fusion;
 use Neos\Utility\Arrays;
 
+/**
+ * @internal
+ */
 class MergedArrayTree
 {
     public function __construct(
@@ -67,7 +71,7 @@ class MergedArrayTree
         });
     }
 
-    protected static function arraySetOrMergeValueByPathWithCallback(array &$subject, array $path, $value, callable $toArray): void
+    protected static function arraySetOrMergeValueByPathWithCallback(array &$subject, array $path, mixed $value, callable $toArray): void
     {
         // points to the current path element, but inside the tree.
         $pointer = &$subject;

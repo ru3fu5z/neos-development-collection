@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\TypeConverter;
 
 /*
@@ -43,7 +44,7 @@ class AssetInterfaceConverter extends PersistentObjectConverter
     /**
      * @var integer
      */
-    const CONFIGURATION_ONE_PER_RESOURCE = 'onePerResource';
+    public const CONFIGURATION_ONE_PER_RESOURCE = 'onePerResource';
 
     /**
      * @var array
@@ -166,7 +167,7 @@ class AssetInterfaceConverter extends PersistentObjectConverter
      * @throws InvalidPropertyMappingConfigurationException
      * @throws \InvalidArgumentException
      */
-    public function getTargetTypeForSource($source, $originalTargetType, PropertyMappingConfigurationInterface $configuration = null)
+    public function getTargetTypeForSource($source, $originalTargetType, ?PropertyMappingConfigurationInterface $configuration = null)
     {
         $targetType = $originalTargetType;
 
@@ -198,7 +199,7 @@ class AssetInterfaceConverter extends PersistentObjectConverter
      * @return Error|AssetInterface The converted Asset, a Validation Error or NULL
      * @throws InvalidTargetException
      */
-    public function convertFrom($source, $targetType, array $convertedChildProperties = [], PropertyMappingConfigurationInterface $configuration = null)
+    public function convertFrom($source, $targetType, array $convertedChildProperties = [], ?PropertyMappingConfigurationInterface $configuration = null)
     {
         $object = null;
         if (is_string($source) && $source !== '') {

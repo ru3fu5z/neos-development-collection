@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Tests\Functional\FusionObjects;
 
 /*
@@ -11,6 +12,9 @@ namespace Neos\Fusion\Tests\Functional\FusionObjects;
  * source code.
  */
 
+use Neos\Fusion\Core\FusionGlobals;
+use Neos\Fusion\Core\FusionSourceCodeCollection;
+use Neos\Fusion\Core\RuntimeFactory;
 use Neos\Fusion\Exception;
 
 /**
@@ -25,9 +29,10 @@ class ReservedKeysTest extends AbstractFusionObjectTest
     public function usingReservedKeysThrowsException()
     {
         $this->expectException(Exception::class);
-        $view = $this->buildView();
-        $view->setFusionPathPattern(__DIR__ . '/Fixtures/ReservedKeysFusion');
-        $view->render();
+        $this->objectManager->get(RuntimeFactory::class)->createFromSourceCode(
+            FusionSourceCodeCollection::fromFilePath(__DIR__ . '/Fixtures/ReservedKeysFusion/ReservedKeys.fusion'),
+            FusionGlobals::createEmpty()
+        );
     }
 
     /**

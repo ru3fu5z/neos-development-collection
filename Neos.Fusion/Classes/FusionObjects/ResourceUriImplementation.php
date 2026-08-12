@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\FusionObjects;
 
 /*
@@ -80,7 +81,7 @@ class ResourceUriImplementation extends AbstractFusionObject
      */
     public function isLocalize()
     {
-        return (boolean)$this->fusionValue('localize');
+        return (bool)$this->fusionValue('localize');
     }
 
     /**
@@ -116,10 +117,12 @@ class ResourceUriImplementation extends AbstractFusionObject
         } else {
             $package = $this->getPackage();
             if ($package === null) {
-                $controllerContext = $this->runtime->getControllerContext();
-                /** @var $actionRequest ActionRequest */
-                $actionRequest = $controllerContext->getRequest();
-                $package = $actionRequest->getControllerPackageKey();
+                $possibleRequest = $this->runtime->fusionGlobals->get('request');
+                if ($possibleRequest instanceof ActionRequest) {
+                    $package = $possibleRequest->getControllerPackageKey();
+                } else {
+                    throw new \RuntimeException('Could not infer package-key from action request. Please render Fusion with request or specify a package-key.', 1706624314);
+                }
             }
         }
         $localize = $this->isLocalize();

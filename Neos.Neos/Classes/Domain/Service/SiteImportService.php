@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Domain\Service;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,243 +10,119 @@ namespace Neos\Neos\Domain\Service;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Domain\Service;
+
+use Doctrine\DBAL\Exception as DBALException;
+use League\Flysystem\Filesystem;
+use League\Flysystem\Local\LocalFilesystemAdapter;
+use Neos\ContentRepository\Core\Projection\ProjectionStatusType;
+use Neos\ContentRepository\Core\Service\ContentRepositoryMaintainer;
+use Neos\ContentRepository\Core\Service\ContentRepositoryMaintainerFactory;
+use Neos\ContentRepository\Core\SharedModel\ContentRepository\ContentRepositoryId;
+use Neos\ContentRepository\Core\SharedModel\Workspace\WorkspaceName;
+use Neos\ContentRepository\Core\Subscription\ProjectionSubscriptionStatus;
+use Neos\ContentRepository\Export\Factory\EventStoreImportProcessorFactory;
+use Neos\ContentRepository\Export\ProcessingContext;
+use Neos\ContentRepository\Export\ProcessorInterface;
+use Neos\ContentRepository\Export\Processors;
+use Neos\ContentRepository\Export\Processors\AssetRepositoryImportProcessor;
+use Neos\ContentRepository\Export\Severity;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
+use Neos\ContentRepositoryRegistry\Processors\SubscriptionReplayProcessor;
+use Neos\EventStore\Model\EventStore\StatusType;
 use Neos\Flow\Annotations as Flow;
-use Neos\Flow\ObjectManagement\ObjectManagerInterface;
-use Neos\Flow\Package\Exception\InvalidPackageStateException;
-use Neos\Flow\Package\Exception\UnknownPackageException;
-use Neos\Flow\Package\PackageManager;
+use Neos\Flow\Persistence\Doctrine\Service as DoctrineService;
 use Neos\Flow\Persistence\PersistenceManagerInterface;
-use Neos\Flow\Reflection\ReflectionService;
-use Neos\Media\Domain\Model\AssetInterface;
-use Neos\Media\Domain\Model\ImageVariant;
-use Neos\Neos\Domain\Model\Site;
+use Neos\Flow\ResourceManagement\ResourceManager;
+use Neos\Flow\ResourceManagement\ResourceRepository;
+use Neos\Media\Domain\Repository\AssetRepository;
+use Neos\Neos\Domain\Import\LiveWorkspaceCreationProcessor;
+use Neos\Neos\Domain\Import\SiteCreationProcessor;
+use Neos\Neos\Domain\Repository\DomainRepository;
 use Neos\Neos\Domain\Repository\SiteRepository;
-use Neos\Neos\EventLog\Domain\Service\EventEmittingService;
-use Neos\Neos\Exception as NeosException;
-use Neos\ContentRepository\Domain\Model\Workspace;
-use Neos\ContentRepository\Domain\Repository\WorkspaceRepository;
-use Neos\ContentRepository\Domain\Service\ContextFactoryInterface;
-use Neos\ContentRepository\Domain\Service\ImportExport\NodeImportService;
-use Neos\ContentRepository\Domain\Utility\NodePaths;
 
-/**
- * The Site Import Service
- *
- * @Flow\Scope("singleton")
- * @api
- */
-class SiteImportService
+#[Flow\Scope('singleton')]
+final readonly class SiteImportService
 {
-    /**
-     * @Flow\Inject
-     * @var PackageManager
-     */
-    protected $packageManager;
-
-    /**
-     * @Flow\Inject
-     * @var SiteRepository
-     */
-    protected $siteRepository;
-
-    /**
-     * @Flow\Inject
-     * @var ContextFactoryInterface
-     */
-    protected $contextFactory;
-
-    /**
-     * @Flow\Inject
-     * @var NodeImportService
-     */
-    protected $nodeImportService;
-
-    /**
-     * @Flow\Inject
-     * @var WorkspaceRepository
-     */
-    protected $workspaceRepository;
-
-    /**
-     * @Flow\Inject
-     * @var ReflectionService
-     */
-    protected $reflectionService;
-
-    /**
-     * @Flow\Inject
-     * @var ObjectManagerInterface
-     */
-    protected $objectManager;
-
-    /**
-     * @Flow\Inject
-     * @var PersistenceManagerInterface
-     */
-    protected $persistenceManager;
-
-    /**
-     * @Flow\Inject
-     * @var EventEmittingService
-     */
-    protected $eventEmittingService;
-
-    /**
-     * @var string
-     */
-    protected $resourcesPath = null;
-
-    /**
-     * An array that contains all fully qualified class names that extend ImageVariant including ImageVariant itself
-     *
-     * @var array<string>
-     */
-    protected $imageVariantClassNames = [];
-
-    /**
-     * An array that contains all fully qualified class names that implement AssetInterface
-     *
-     * @var array<string>
-     */
-    protected $assetClassNames = [];
-
-    /**
-     * An array that contains all fully qualified class names that extend \DateTime including \DateTime itself
-     *
-     * @var array<string>
-     */
-    protected $dateTimeClassNames = [];
-
-    /**
-     * @return void
-     */
-    public function initializeObject()
-    {
-        $this->imageVariantClassNames = $this->reflectionService->getAllSubClassNamesForClass(ImageVariant::class);
-        array_unshift($this->imageVariantClassNames, ImageVariant::class);
-
-        $this->assetClassNames = $this->reflectionService->getAllImplementationClassNamesForInterface(AssetInterface::class);
-
-        $this->dateTimeClassNames = $this->reflectionService->getAllSubClassNamesForClass('DateTime');
-        array_unshift($this->dateTimeClassNames, 'DateTime');
+    public function __construct(
+        private ContentRepositoryRegistry $contentRepositoryRegistry,
+        private DoctrineService $doctrineService,
+        private SiteRepository $siteRepository,
+        private DomainRepository $domainRepository,
+        private AssetRepository $assetRepository,
+        private ResourceRepository $resourceRepository,
+        private ResourceManager $resourceManager,
+        private PersistenceManagerInterface $persistenceManager,
+        private WorkspaceService $workspaceService,
+    ) {
     }
 
     /**
-     * Checks for the presence of Sites.xml in the given package and imports it if found.
-     *
-     * @param string $packageKey
-     * @return Site the imported site
-     * @throws NeosException
+     * @param \Closure(string): void $onProcessor Callback that is invoked for each {@see ProcessorInterface} that is processed
+     * @param \Closure(Severity, string): void $onMessage Callback that is invoked whenever a {@see ProcessorInterface} dispatches a message
      */
-    public function importFromPackage($packageKey)
+    public function importFromPath(ContentRepositoryId $contentRepositoryId, string $path, \Closure $onProcessor, \Closure $onMessage): void
     {
-        if (!$this->packageManager->isPackageAvailable($packageKey)) {
-            throw new NeosException(sprintf('Error: Package "%s" is not active.', $packageKey), 1384192950);
+        if (!is_dir($path)) {
+            throw new \InvalidArgumentException(sprintf('Path "%s" is not a directory', $path), 1729593802);
         }
-        $contentPathAndFilename = sprintf('resource://%s/Private/Content/Sites.xml', $packageKey);
-        if (!file_exists($contentPathAndFilename)) {
-            throw new NeosException(sprintf('Error: No content found in package "%s".', $packageKey), 1384192955);
+        $contentRepository = $this->contentRepositoryRegistry->get($contentRepositoryId);
+
+        $contentRepositoryMaintainer = $this->contentRepositoryRegistry->buildService($contentRepositoryId, new ContentRepositoryMaintainerFactory());
+
+        $this->requireDataBaseSchemaToBeSetup();
+        $this->requireContentRepositoryToBeSetup($contentRepositoryMaintainer, $contentRepositoryId);
+
+        $filesystem = new Filesystem(new LocalFilesystemAdapter($path));
+        $context = new ProcessingContext($filesystem, $onMessage);
+
+        $processors = Processors::fromArray([
+            'Create Live workspace' => new LiveWorkspaceCreationProcessor($contentRepository, $this->workspaceService),
+            'Create Neos sites' => new SiteCreationProcessor($this->siteRepository, $this->domainRepository, $this->persistenceManager),
+            'Import events' => $this->contentRepositoryRegistry->buildService($contentRepositoryId, new EventStoreImportProcessorFactory(WorkspaceName::forLive(), keepEventIds: true)),
+            'Import assets' => new AssetRepositoryImportProcessor($this->assetRepository, $this->resourceRepository, $this->resourceManager, $this->persistenceManager),
+            // WARNING! We do a replay here even though it will redo the live workspace creation. But otherwise the catchup hooks cannot determine that they need to be skipped as it seems like a regular catchup
+            // In case we allow to import events into other root workspaces, or don't expect live to be empty (see Import events), this would need to be adjusted, as otherwise existing data will be replayed
+            'Replay all subscriptions' => new SubscriptionReplayProcessor($contentRepositoryMaintainer),
+        ]);
+
+        foreach ($processors as $processorLabel => $processor) {
+            ($onProcessor)($processorLabel);
+            $processor->run($context);
         }
+    }
+
+    private function requireContentRepositoryToBeSetup(ContentRepositoryMaintainer $contentRepositoryMaintainer, ContentRepositoryId $contentRepositoryId): void
+    {
+        $status = $contentRepositoryMaintainer->status();
+        if ($status->eventStoreStatus->type !== StatusType::OK) {
+            throw new \RuntimeException(sprintf('Content repository %s is not setup correctly, please run `./flow cr:setup`', $contentRepositoryId->value));
+        }
+        foreach ($status->subscriptionStatus as $status) {
+            if ($status instanceof ProjectionSubscriptionStatus) {
+                if ($status->setupStatus->type !== ProjectionStatusType::OK) {
+                    throw new \RuntimeException(sprintf('Projection %s in content repository %s is not setup correctly, please run `./flow cr:setup`', $status->subscriptionId->value, $contentRepositoryId->value));
+                }
+            }
+        }
+    }
+
+    private function requireDataBaseSchemaToBeSetup(): void
+    {
         try {
-            return $this->importFromFile($contentPathAndFilename);
-        } catch (\Exception $exception) {
-            throw new NeosException(sprintf('Error: During import an exception occurred: "%s".', $exception->getMessage()), 1300360480, $exception);
-        }
-    }
-
-    /**
-     * Imports one or multiple sites from the XML file at $pathAndFilename
-     *
-     * @param string $pathAndFilename
-     * @return Site The imported site
-     * @throws UnknownPackageException|InvalidPackageStateException|NeosException
-     */
-    public function importFromFile($pathAndFilename)
-    {
-        if (!file_exists($pathAndFilename)) {
-            throw new NeosException(sprintf('Error: File "%s" does not exist.', $pathAndFilename), 1540934412);
+            [
+                'new' => $_newMigrationCount,
+                'executed' => $executedMigrationCount,
+                'available' => $availableMigrationCount
+            ] = $this->doctrineService->getMigrationStatus();
+        } catch (DBALException | \PDOException) {
+            throw new \RuntimeException('Not database connected. Please check your database connection settings or run `./flow setup` for further information.', 1684075689386);
         }
 
-        /** @var Site $importedSite */
-        $site = null;
-        $xmlReader = new \XMLReader();
-        if ($xmlReader->open($pathAndFilename, null, LIBXML_PARSEHUGE) === false) {
-            throw new NeosException(sprintf('Error: XMLReader could not open "%s".', $pathAndFilename), 1540934199);
+        if ($executedMigrationCount === 0 && $availableMigrationCount > 0) {
+            throw new \RuntimeException('No doctrine migrations have been executed. Please run `./flow doctrine:migrate`');
         }
-
-        if ($this->workspaceRepository->findOneByName('live') === null) {
-            $this->workspaceRepository->add(new Workspace('live'));
-            $this->persistenceManager->persistAll();
-        }
-
-        while ($xmlReader->read()) {
-            if ($xmlReader->nodeType != \XMLReader::ELEMENT || $xmlReader->name !== 'site') {
-                continue;
-            }
-
-            $site = $this->getSiteByNodeName($xmlReader->getAttribute('siteNodeName'));
-            $site->setName($xmlReader->getAttribute('name'));
-            $site->setState((integer)$xmlReader->getAttribute('state'));
-
-            $siteResourcesPackageKey = $xmlReader->getAttribute('siteResourcesPackageKey');
-            if (!$this->packageManager->isPackageAvailable($siteResourcesPackageKey)) {
-                throw new UnknownPackageException(sprintf('Package "%s" specified in the XML as site resources package does not exist.', $siteResourcesPackageKey), 1303891443);
-            }
-            if (!$this->packageManager->isPackageAvailable($siteResourcesPackageKey)) {
-                throw new InvalidPackageStateException(sprintf('Package "%s" specified in the XML as site resources package is not active.', $siteResourcesPackageKey), 1303898135);
-            }
-            $site->setSiteResourcesPackageKey($siteResourcesPackageKey);
-
-            $rootNode = $this->contextFactory->create()->getRootNode();
-            // We fetch the workspace to be sure it's known to the persistence manager and persist all
-            // so the workspace and site node are persisted before we import any nodes to it.
-            $rootNode->getContext()->getWorkspace();
-            $this->persistenceManager->persistAll();
-
-            $sitesNode = $rootNode->getNode(SiteService::SITES_ROOT_PATH);
-            if ($sitesNode === null) {
-                $sitesNode = $rootNode->createNode(NodePaths::getNodeNameFromPath(SiteService::SITES_ROOT_PATH));
-            }
-
-            $this->nodeImportService->import($xmlReader, $sitesNode->getPath(), dirname($pathAndFilename) . '/Resources');
-        }
-
-        if ($site === null) {
-            throw new NeosException(sprintf('The XML file did not contain a valid site node.'), 1418999522);
-        }
-        $this->emitSiteImported($site);
-        return $site;
-    }
-
-    /**
-     * Updates or creates a site with the given $siteNodeName
-     *
-     * @param string $siteNodeName
-     * @return Site
-     */
-    protected function getSiteByNodeName($siteNodeName)
-    {
-        $site = $this->siteRepository->findOneByNodeName($siteNodeName);
-
-        if ($site === null) {
-            $site = new Site($siteNodeName);
-            $this->siteRepository->add($site);
-        } else {
-            $this->siteRepository->update($site);
-        }
-
-        return $site;
-    }
-
-
-    /**
-     * Signal that is triggered when a site has been imported successfully
-     *
-     * @Flow\Signal
-     * @param Site $site The site that has been imported
-     * @return void
-     */
-    protected function emitSiteImported(Site $site)
-    {
     }
 }

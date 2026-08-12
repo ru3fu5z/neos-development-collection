@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Domain\Service;
 
 /*
@@ -48,8 +49,10 @@ class ThumbnailGenerator
     {
         if ($this->autoCreateThumbnailPresets) {
             foreach ($this->thumbnailService->getPresets() as $preset => $presetConfiguration) {
-                $thumbnailConfiguration = $this->thumbnailService->getThumbnailConfigurationForPreset($preset, $this->asyncThumbnails);
-                $this->thumbnailService->getThumbnail($image, $thumbnailConfiguration);
+                if ($presetConfiguration) {
+                    $thumbnailConfiguration = $this->thumbnailService->getThumbnailConfigurationForPreset($preset, $this->asyncThumbnails);
+                    $this->thumbnailService->getThumbnail($image, $thumbnailConfiguration);
+                }
             }
         }
     }

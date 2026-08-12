@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser;
@@ -14,39 +15,39 @@ namespace Neos\Fusion\Core\ObjectTreeParser;
  */
 
 use Neos\Fusion;
-
 use Neos\Fusion\Core\FusionSourceCode;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionFile;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\StatementList;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\AbstractStatement;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\IncludeStatement;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectStatement;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\Block;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectPath;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\AbstractPathSegment;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\MetaPathSegment;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\PrototypePathSegment;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\PathSegment;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueAssignment;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\AbstractPathValue;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionObjectValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\AbstractStatement;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\AssignedObjectPath;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\Block;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\BoolValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\DslExpressionValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\EelExpressionValue;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\FloatValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionFile;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\FusionObjectValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\IncludeStatement;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\IntValue;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\BoolValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\MetaPathSegment;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\NullValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectPath;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\ObjectStatement;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\PathSegment;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\PrototypePathSegment;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\StatementList;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\StringValue;
+use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueAssignment;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueCopy;
-use Neos\Fusion\Core\ObjectTreeParser\Ast\AssignedObjectPath;
 use Neos\Fusion\Core\ObjectTreeParser\Ast\ValueUnset;
-use Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage\MessageCreator;
-use Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage\MessageLinePart;
 use Neos\Fusion\Core\ObjectTreeParser\Exception\ParserException;
 use Neos\Fusion\Core\ObjectTreeParser\Exception\ParserUnexpectedCharException;
+use Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage\MessageCreator;
+use Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage\MessageLinePart;
 
 /**
  * Parses a Fusion File to object ast-nodes
+ * @internal
  */
 class ObjectTreeParser
 {
@@ -63,7 +64,7 @@ class ObjectTreeParser
     public static function parse(FusionSourceCode $fusionCode): FusionFile
     {
         $lexer = new Lexer($fusionCode->getSourceCode());
-        $parser = new static($lexer, $fusionCode->getFilePath());
+        $parser = new self($lexer, $fusionCode->getFilePath());
         return $parser->parseFusionFile();
     }
 
@@ -117,9 +118,9 @@ class ObjectTreeParser
     /**
      * Checks, if the token type matches the current, if so consume it and return true.
      * @param int $tokenType
-     * @return bool|null
+     * @return bool
      */
-    protected function lazyExpect(int $tokenType): ?bool
+    protected function lazyExpect(int $tokenType): bool
     {
         $token = $this->lexer->getCachedLookaheadOrTryToGenerateLookaheadForTokenAndGetLookahead($tokenType);
         if ($token === null || $token->getType() !== $tokenType) {

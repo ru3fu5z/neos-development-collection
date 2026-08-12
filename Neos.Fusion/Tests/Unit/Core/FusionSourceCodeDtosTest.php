@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Fusion\Tests\Unit\Core;
 
 /*
@@ -22,7 +23,7 @@ class FusionSourceCodeDtosTest extends UnitTestCase
     {
         self::assertCount(1, $collection);
         /** @var FusionSourceCode[] $asArray */
-        $asArray = $collection->getIterator()->getArrayCopy();
+        $asArray = iterator_to_array($collection);
         return $asArray[0];
     }
 
@@ -45,7 +46,7 @@ class FusionSourceCodeDtosTest extends UnitTestCase
         self::assertEquals("a", $code->getSourceCode());
         self::assertEquals("memory://a", $code->getFilePath());
 
-        $code = FusionSourceCodeCollection::empty();
+        $code = FusionSourceCodeCollection::createEmpty();
         self::assertCount(0, $code);
     }
 
@@ -108,7 +109,7 @@ class FusionSourceCodeDtosTest extends UnitTestCase
 
         self::assertCount(2, $collection, "The deduplication didnt work.");
 
-        $asArray = $collection->getIterator()->getArrayCopy();
+        $asArray = iterator_to_array($collection);
 
         self::assertEquals($code2, $asArray[0]);
         self::assertEquals($code1doubled, $asArray[1]);
@@ -141,7 +142,7 @@ class FusionSourceCodeDtosTest extends UnitTestCase
 
         self::assertCount(4, $collection, "The deduplication didnt work.");
 
-        $asArray = $collection->getIterator()->getArrayCopy();
+        $asArray = iterator_to_array($collection);
 
         self::assertEquals($code2, $asArray[0]);
         self::assertEquals($code3, $asArray[1]);
@@ -174,7 +175,7 @@ class FusionSourceCodeDtosTest extends UnitTestCase
 
         self::assertCount(3, $collection, "The deduplication didnt work.");
 
-        $asArray = $collection->getIterator()->getArrayCopy();
+        $asArray = iterator_to_array($collection);
 
         self::assertEquals($code2, $asArray[0]);
         self::assertEquals($code3, $asArray[1]);
@@ -196,7 +197,7 @@ class FusionSourceCodeDtosTest extends UnitTestCase
         self::assertCount(2, $collection, "The union didnt work.");
 
         /** @var FusionSourceCode[] $asArray */
-        $asArray = $collection->getIterator()->getArrayCopy();
+        $asArray = iterator_to_array($collection);
 
         self::assertEquals("a", $asArray[0]->getSourceCode());
         self::assertEquals("b", $asArray[1]->getSourceCode());

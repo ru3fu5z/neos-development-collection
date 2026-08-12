@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\TypeConverter;
 
 /*
@@ -15,11 +16,11 @@ use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Flow\Property\PropertyMappingConfigurationInterface;
 use Neos\Flow\Property\TypeConverter\AbstractTypeConverter;
-use Neos\Utility\ObjectAccess;
-use Neos\Utility\TypeHandling;
 use Neos\Flow\Validation\Error;
 use Neos\Media\Domain\Model\ImageInterface;
 use Neos\Media\Domain\Model\ImageVariant;
+use Neos\Utility\ObjectAccess;
+use Neos\Utility\TypeHandling;
 
 /**
  * This converter transforms \Neos\Media\Domain\Model\ImageInterface (Image or ImageVariant) objects to array representations.
@@ -83,7 +84,7 @@ class ImageInterfaceArrayPresenter extends AbstractTypeConverter
      * @param PropertyMappingConfigurationInterface $configuration
      * @return string|Error The converted Image, a Validation Error or NULL
      */
-    public function convertFrom($source, $targetType, array $convertedChildProperties = [], PropertyMappingConfigurationInterface $configuration = null)
+    public function convertFrom($source, $targetType, array $convertedChildProperties = [], ?PropertyMappingConfigurationInterface $configuration = null)
     {
         $data = [
             '__identity' => $this->persistenceManager->getIdentifierByObject($source),

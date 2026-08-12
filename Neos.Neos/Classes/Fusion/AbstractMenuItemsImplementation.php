@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Fusion;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,81 +10,99 @@ namespace Neos\Neos\Fusion;
  * source code.
  */
 
-use Neos\ContentRepository\Domain\Model\NodeInterface;
+declare(strict_types=1);
+
+namespace Neos\Neos\Fusion;
+
+use Neos\ContentRepository\Core\Projection\ContentGraph\Node;
+use Neos\ContentRepositoryRegistry\ContentRepositoryRegistry;
+use Neos\Flow\Annotations as Flow;
 use Neos\Fusion\Exception as FusionException;
 use Neos\Fusion\FusionObjects\AbstractFusionObject;
 
 /**
- * Base class for MenuItems and DimensionsMenuItems
+ * Base class for Menu and DimensionsMenu
  *
  * Main Options:
- *  - renderHiddenInIndex: if true, hidden-in-index nodes will be shown in the menu. false by default.
+ *  - renderHiddenInMenu: if TRUE, nodes with the property ``hiddenInMenu`` will be shown in the menu. FALSE by default.
  */
 abstract class AbstractMenuItemsImplementation extends AbstractFusionObject
 {
-    const STATE_NORMAL = 'normal';
-    const STATE_CURRENT = 'current';
-    const STATE_ACTIVE = 'active';
-    const STATE_ABSENT = 'absent';
-
     /**
      * An internal cache for the built menu items array.
      *
-     * @var array
+     * @var array<int,MenuItem>
      */
     protected $items;
 
     /**
-     * @var NodeInterface
+     * @var Node
      */
     protected $currentNode;
 
     /**
-     * Internal cache for the currentLevel tsValue.
-     *
-     * @var integer
-     */
-    protected $currentLevel;
-
-    /**
-     * Internal cache for the renderHiddenInIndex property.
+     * Internal cache for the renderHiddenInMenu property.
      *
      * @var boolean
      */
-    protected $renderHiddenInIndex;
+    protected $renderHiddenInMenu;
 
     /**
-     * Rootline of all nodes from the current node to the site root node, keys are depth of nodes.
+     * Internal cache for the calculateItemStates property.
      *
-     * @var array<NodeInterface>
+     * @var boolean
      */
-    protected $currentNodeRootline;
+    protected $calculateItemStates;
+
+    #[Flow\Inject]
+    protected ContentRepositoryRegistry $contentRepositoryRegistry;
 
     /**
-     * Should nodes that have "hiddenInIndex" set still be visible in this menu.
-     *
-     * @return boolean
+     * Whether the active/current state of menu items is calculated on the server side.
+     * This has an effect on performance and caching
      */
-    public function getRenderHiddenInIndex()
+    public function isCalculateItemStatesEnabled(): bool
     {
-        if ($this->renderHiddenInIndex === null) {
-            $this->renderHiddenInIndex = (boolean)$this->fusionValue('renderHiddenInIndex');
+        if ($this->calculateItemStates === null) {
+            $this->calculateItemStates = (bool)$this->fusionValue('calculateItemStates');
         }
 
-        return $this->renderHiddenInIndex;
+        return $this->calculateItemStates;
+    }
+
+    /**
+     * Should nodes that have "hiddenInMenu" set still be visible in this menu.
+     */
+    public function getRenderHiddenInMenu(): bool
+    {
+        if ($this->renderHiddenInMenu === null) {
+            $this->renderHiddenInMenu = (bool)$this->fusionValue('renderHiddenInMenu');
+        }
+
+        return $this->renderHiddenInMenu;
+    }
+
+    /**
+     * The node the menu is built from, all relative specifications will
+     * use this as a base
+     */
+    public function getCurrentNode(): Node
+    {
+        if ($this->currentNode === null) {
+            $this->currentNode = $this->fusionValue('node');
+        }
+
+        return $this->currentNode;
     }
 
     /**
      * Main API method which sends the to-be-rendered data to Fluid
      *
-     * @return array
+     * @return array<int,MenuItem>
      */
-    public function getItems()
+    public function getItems(): array
     {
         if ($this->items === null) {
-            $fusionContext = $this->runtime->getCurrentContext();
-            $this->currentNode = $fusionContext['activeNode'] ?? $fusionContext['documentNode'];
-            $this->currentLevel = 1;
             $this->items = $this->buildItems();
         }
 
@@ -95,7 +112,7 @@ abstract class AbstractMenuItemsImplementation extends AbstractFusionObject
     /**
      * Returns the items as result of the fusion object.
      *
-     * @return array
+     * @return array<int,MenuItem>
      */
     public function evaluate()
     {
@@ -109,78 +126,39 @@ abstract class AbstractMenuItemsImplementation extends AbstractFusionObject
      * Must be overridden in subclasses.
      *
      * @throws FusionException
-     * @return array An array of menu items and further information
+     * @return array<int,mixed> An array of menu items and further information
      */
-    abstract protected function buildItems();
+    abstract protected function buildItems(): array;
 
     /**
-     * Helper Method: Calculates the state of the given menu item (node) depending on the currentNode.
+     * Return TRUE/FALSE if the node is currently hidden or not in the menu;
+     * taking the "renderHiddenInMenu" configuration of the Menu Fusion object into account.
      *
      * This method needs to be called inside buildItems() in the subclasses.
      *
-     * @param NodeInterface $node
-     * @return string
-     */
-    protected function calculateItemState(NodeInterface $node = null)
-    {
-        if ($node === null) {
-            return self::STATE_ABSENT;
-        }
-
-        if ($node === $this->currentNode) {
-            return self::STATE_CURRENT;
-        }
-
-        if ($node !== $this->currentNode->getContext()->getCurrentSiteNode() && in_array($node, $this->getCurrentNodeRootline(), true)) {
-            return self::STATE_ACTIVE;
-        }
-
-        return self::STATE_NORMAL;
-    }
-
-    /**
-     * Return true/false if the node is currently hidden or not in the menu; taking the "renderHiddenInIndex" configuration
-     * of the Menu Fusion object into account.
-     *
-     * This method needs to be called inside buildItems() in the subclasses.
-     *
-     * @param NodeInterface $node
+     * @param Node $node
      * @return boolean
      */
-    protected function isNodeHidden(NodeInterface $node)
+    protected function isNodeHidden(Node $node)
     {
-        return ($node->isVisible() === false || ($this->getRenderHiddenInIndex() === false && $node->isHiddenInIndex() === true) || $node->isAccessible() === false);
-    }
-
-    /**
-     * Get the rootline from the current node up to the site node.
-     *
-     * @return array
-     */
-    protected function getCurrentNodeRootline()
-    {
-        if ($this->currentNodeRootline === null) {
-            $nodeRootline = $this->currentNode->getContext()->getNodesOnPath($this->currentNode->getContext()->getCurrentSiteNode()->getPath(), $this->currentNode->getPath());
-            $this->currentNodeRootline = [];
-
-            foreach ($nodeRootline as $rootlineElement) {
-                $this->currentNodeRootline[$this->getNodeLevelInSite($rootlineElement)] = $rootlineElement;
-            }
+        if ($this->getRenderHiddenInMenu() === true) {
+            // Please show hiddenInMenu nodes
+            // -> node is *never* hidden!
+            return false;
         }
 
-        return $this->currentNodeRootline;
+        // Node is hidden depending on the hiddenInMenu property
+        return $node->getProperty('hiddenInMenu');
     }
 
-    /**
-     * Node Level relative to site root node.
-     * 0 = Site root node
-     *
-     * @param NodeInterface $node
-     * @return integer
-     */
-    protected function getNodeLevelInSite(NodeInterface $node)
+    protected function buildUri(Node $node): string
     {
-        $siteNode = $this->currentNode->getContext()->getCurrentSiteNode();
-        return $node->getDepth() - $siteNode->getDepth();
+        $this->runtime->pushContextArray([
+            'itemNode' => $node,
+            'documentNode' => $node,
+        ]);
+        $uri = $this->runtime->render($this->path . '/itemUriRenderer');
+        $this->runtime->popContext();
+        return $uri;
     }
 }

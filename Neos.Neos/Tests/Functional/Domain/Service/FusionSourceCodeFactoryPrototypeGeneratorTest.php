@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Neos\Tests\Functional\Domain\Service;
 
 /*
@@ -11,12 +12,12 @@ namespace Neos\Neos\Tests\Functional\Domain\Service;
  * source code.
  */
 
+use Neos\ContentRepository\Domain\Service\NodeTypeManager;
+use Neos\Flow\Tests\FunctionalTestCase;
 use Neos\Neos\Domain\Exception;
 use Neos\Neos\Domain\Service\FusionSourceCodeFactory;
-use Symfony\Component\Yaml\Parser as YamlParser;
-use Neos\Flow\Tests\FunctionalTestCase;
 use Neos\Neos\Tests\Functional\Domain\Service\Fixtures\TestablePrototypeGenerator;
-use Neos\ContentRepository\Domain\Service\NodeTypeManager;
+use Symfony\Component\Yaml\Parser as YamlParser;
 
 /**
  * Tests for the TypoFusionService
@@ -38,6 +39,7 @@ class FusionSourceCodeFactoryPrototypeGeneratorTest extends FunctionalTestCase
     public function setUp(): void
     {
         parent::setUp();
+        $this->markTestSkipped('re-implement with Neos 9.0');
 
         $yamlParser = $this->objectManager->get(YamlParser::class);
         $this->originalNodeTypeManager = $this->objectManager->get(NodeTypeManager::class);

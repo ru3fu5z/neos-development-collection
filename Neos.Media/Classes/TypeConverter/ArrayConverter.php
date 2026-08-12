@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\TypeConverter;
 
 /*
@@ -110,7 +111,7 @@ class ArrayConverter extends AbstractTypeConverter
      * @param PropertyMappingConfigurationInterface $configuration
      * @return array The converted asset or NULL
      */
-    public function convertFrom($source, $targetType, array $convertedChildProperties = [], PropertyMappingConfigurationInterface $configuration = null)
+    public function convertFrom($source, $targetType, array $convertedChildProperties = [], ?PropertyMappingConfigurationInterface $configuration = null)
     {
         $identity = $this->persistenceManager->getIdentifierByObject($source);
         switch (true) {
@@ -151,5 +152,6 @@ class ArrayConverter extends AbstractTypeConverter
                     'assetCollections' => $convertedChildProperties['assetCollections']
                 ];
         }
+        return null;
     }
 }

@@ -1,4 +1,5 @@
 <?php
+
 namespace Neos\Media\Tests\Functional\Fixtures\Controller;
 
 /*
@@ -15,6 +16,7 @@ use Neos\Flow\Annotations as Flow;
 use Neos\Flow\Mvc\Controller\ActionController;
 use Neos\Flow\Mvc\View\ViewInterface;
 use Neos\Flow\Persistence\Exception\IllegalObjectTypeException;
+use Neos\Flow\Persistence\PersistenceManagerInterface;
 use Neos\Flow\ResourceManagement\ResourceManager;
 use Neos\FluidAdaptor\View\TemplateView;
 use Neos\Media\Domain\Model\Image;
@@ -39,6 +41,12 @@ class ImageController extends ActionController
      * @var AssetRepository
      */
     protected $assetRepository;
+
+    /**
+     * @Flow\Inject
+     * @var PersistenceManagerInterface
+     */
+    protected $persistenceManager;
 
     /**
      * @param ViewInterface $view

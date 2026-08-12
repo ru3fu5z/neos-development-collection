@@ -1,5 +1,4 @@
 <?php
-namespace Neos\Neos\Controller\Backend;
 
 /*
  * This file is part of the Neos.Neos package.
@@ -11,20 +10,23 @@ namespace Neos\Neos\Controller\Backend;
  * source code.
  */
 
+declare(strict_types=1);
+
+namespace Neos\Neos\Controller\Backend;
+
 use Neos\Flow\Annotations as Flow;
-use Neos\Flow\Mvc\ActionResponse;
 use Neos\Flow\Mvc\Controller\ActionController;
 use Neos\Flow\Mvc\Dispatcher;
+use Neos\Flow\Security\Account;
 use Neos\Flow\Security\Context;
-use Neos\Utility\Arrays;
-use Neos\Utility\MediaTypes;
 use Neos\Neos\Controller\BackendUserTranslationTrait;
 use Neos\Neos\Controller\Exception\DisabledModuleException;
+use Neos\Neos\Service\BackendRedirectionService;
 use Neos\Party\Domain\Service\PartyService;
+use Neos\Utility\Arrays;
+use Neos\Utility\MediaTypes;
 
-/**
- * @Flow\Scope("singleton")
- */
+#[Flow\Scope('singleton')]
 class ModuleController extends ActionController
 {
     use BackendUserTranslationTrait;
@@ -54,7 +56,14 @@ class ModuleController extends ActionController
     protected $partyService;
 
     /**
+     * @Flow\Inject
+     * @var BackendRedirectionService
+     */
+    protected $backendRedirectionService;
+
+    /**
      * @param array $module
+     * @phpstan-param array<string,mixed> $module
      * @return mixed
      * @throws DisabledModuleException
      */
@@ -67,7 +76,10 @@ class ModuleController extends ActionController
         if (isset($module['format'])) {
             $moduleRequest->setFormat($module['format']);
         }
-        if ($this->request->hasArgument($moduleRequest->getArgumentNamespace()) === true && is_array($this->request->getArgument($moduleRequest->getArgumentNamespace()))) {
+        if (
+            $this->request->hasArgument($moduleRequest->getArgumentNamespace()) === true
+            && is_array($this->request->getArgument($moduleRequest->getArgumentNamespace()))
+        ) {
             $moduleRequest->setArguments($this->request->getArgument($moduleRequest->getArgumentNamespace()));
         }
         foreach ($this->request->getPluginArguments() as $argumentNamespace => $argument) {
@@ -80,47 +92,56 @@ class ModuleController extends ActionController
         $moduleConfiguration['path'] = $module['module'];
 
         if (!$this->menuHelper->isModuleEnabled($moduleConfiguration['path'])) {
-            throw new DisabledModuleException(sprintf('The module "%s" is disabled. You can enable it with the "enabled" flag in Settings.yaml.', $module['module']), 1437148922);
+            throw new DisabledModuleException(sprintf(
+                'The module "%s" is disabled. You can enable it with the "enabled" flag in Settings.yaml.',
+                $module['module']
+            ), 1437148922);
         }
 
         $moduleBreadcrumb = [];
         $path = [];
         foreach ($modules as $moduleIdentifier) {
-            array_push($path, $moduleIdentifier);
+            $path[] = $moduleIdentifier;
             $config = Arrays::getValueByPath($this->settings['modules'], implode('.submodules.', $path));
             $moduleBreadcrumb[implode('/', $path)] = $config;
         }
 
         $moduleRequest->setArgument('__moduleConfiguration', $moduleConfiguration);
 
-        $moduleResponse = new ActionResponse($this->response);
+        $moduleResponse = $this->dispatcher->dispatch($moduleRequest);
 
-        $this->dispatcher->dispatch($moduleRequest, $moduleResponse);
-
-        if ($moduleResponse->getRedirectUri() !== null) {
-            $this->redirectToUri($moduleResponse->getRedirectUri(), 0, $moduleResponse->getStatusCode());
+        if ($moduleResponse->hasHeader('Location')) {
+            // Preserve redirects see b57d72aeeaa2e6da4d9c0a80363025fefd63d813
+            return $moduleResponse;
         } elseif ($moduleRequest->getFormat() !== 'html') {
+            // Allow ajax request with json or similar dd7e5c99924bf1b8618775bec08cc4f2cb1a6d2a
+            // todo just return $moduleResponse and trust its content-type instead of inferring the requested content-type
             $mediaType = MediaTypes::getMediaTypeFromFilename('file.' . $moduleRequest->getFormat());
             if ($mediaType !== 'application/octet-stream') {
-                $this->controllerContext->getResponse()->setContentType($mediaType);
+                $moduleResponse = $moduleResponse->withHeader('Content-Type', $mediaType);
             }
-            return $moduleResponse->getContent();
+            return $moduleResponse;
         } else {
-            $user = $this->partyService->getAssignedPartyOfAccount($this->securityContext->getAccount());
+            /** @var ?Account $authenticatedAccount */
+            $authenticatedAccount = $this->securityContext->getAccount();
+            $user = $authenticatedAccount === null ? null : $this->partyService->getAssignedPartyOfAccount($authenticatedAccount);
 
             $sites = $this->menuHelper->buildSiteList($this->controllerContext);
 
             $this->view->assignMultiple([
                 'moduleClass' => implode('-', $modules),
-                'moduleContents' => $moduleResponse->getContent(),
-                'title' => $moduleRequest->hasArgument('title') ? $moduleRequest->getArgument('title') : $moduleConfiguration['label'],
+                'moduleContents' => $moduleResponse->getBody()->getContents(),
+                'title' => $moduleRequest->hasArgument('title')
+                    ? $moduleRequest->getArgument('title')
+                    : $moduleConfiguration['label'],
                 'rootModule' => array_shift($modules),
                 'submodule' => array_shift($modules),
                 'moduleConfiguration' => $moduleConfiguration,
                 'moduleBreadcrumb' => $moduleBreadcrumb,
                 'user' => $user,
                 'modules' => $this->menuHelper->buildModuleList($this->controllerContext),
-                'sites' => $sites
+                'sites' => $sites,
+                'primaryModuleUri' => $this->backendRedirectionService->getAfterLoginRedirectionUri($this->controllerContext),
             ]);
         }
     }

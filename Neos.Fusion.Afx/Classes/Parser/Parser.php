@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Afx\Parser;
@@ -39,6 +40,6 @@ class Parser
      */
     public function parse(): array
     {
-        return Expression\NodeList::parse($this->lexer);
+        return Expression\AfxNodeList::parse($this->lexer);
     }
 }

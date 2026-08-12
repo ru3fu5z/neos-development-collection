@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage;
@@ -15,6 +16,7 @@ namespace Neos\Fusion\Core\ObjectTreeParser\ExceptionMessage;
 
 /**
  * Creates exception messages for the Fusion parser
+ * @internal
  */
 class MessageCreator
 {

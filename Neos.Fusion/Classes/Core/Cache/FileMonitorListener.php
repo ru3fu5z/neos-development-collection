@@ -1,4 +1,7 @@
 <?php
+
+declare(strict_types=1);
+
 namespace Neos\Fusion\Core\Cache;
 
 /*
@@ -37,8 +40,8 @@ class FileMonitorListener
     }
 
     /**
-     * @param $fileMonitorIdentifier
-     * @param array $changedFiles
+     * @param string $fileMonitorIdentifier
+     * @param array<string, int> $changedFiles
      * @return void
      */
     public function flushContentCacheOnFileChanges($fileMonitorIdentifier, array $changedFiles)

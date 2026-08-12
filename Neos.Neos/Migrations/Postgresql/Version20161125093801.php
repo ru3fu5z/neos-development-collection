@@ -1,8 +1,10 @@
 <?php
+
 namespace Neos\Flow\Persistence\Doctrine\Migrations;
 
-use Doctrine\Migrations\AbstractMigration;
+use Doctrine\DBAL\Platforms\PostgreSQLPlatform;
 use Doctrine\DBAL\Schema\Schema;
+use Doctrine\Migrations\AbstractMigration;
 
 /**
  * Adjust table names to the renaming of TYPO3.Neos to Neos.Neos.
@@ -13,9 +15,9 @@ class Version20161125093801 extends AbstractMigration
      * @param Schema $schema
      * @return void
      */
-    public function up(Schema $schema): void 
+    public function up(Schema $schema): void
     {
-        $this->abortIf($this->connection->getDatabasePlatform()->getName() != 'postgresql', 'Migration can only be executed safely on "postgresql".');
+        $this->abortIf(!($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform), 'Migration can only be executed safely on "postgresql".');
 
         $this->addSql('ALTER TABLE typo3_neos_domain_model_domain RENAME TO neos_neos_domain_model_domain');
         $this->addSql('ALTER TABLE typo3_neos_domain_model_site RENAME TO neos_neos_domain_model_site');
@@ -28,9 +30,9 @@ class Version20161125093801 extends AbstractMigration
      * @param Schema $schema
      * @return void
      */
-    public function down(Schema $schema): void 
+    public function down(Schema $schema): void
     {
-        $this->abortIf($this->connection->getDatabasePlatform()->getName() != 'postgresql', 'Migration can only be executed safely on "postgresql".');
+        $this->abortIf(!($this->connection->getDatabasePlatform() instanceof PostgreSQLPlatform), 'Migration can only be executed safely on "postgresql".');
 
         $this->addSql('ALTER TABLE neos_neos_domain_model_domain RENAME TO typo3_neos_domain_model_domain');
         $this->addSql('ALTER TABLE neos_neos_domain_model_site RENAME TO typo3_neos_domain_model_site');
